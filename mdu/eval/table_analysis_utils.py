@@ -522,7 +522,9 @@ def analyze_composite_pareto_performance(
                 }  # Track depths for each component
 
             for problem1, problem2 in itertools.combinations(problems, 2):
-                if different_only and (problem1[1].split()[1] == problem2[1].split()[1]):
+                if different_only and (
+                    problem1[1].split()[1] == problem2[1].split()[1]
+                ):
                     continue
                 row1 = composite_df.loc[problem1]
                 row2 = composite_df.loc[problem2]

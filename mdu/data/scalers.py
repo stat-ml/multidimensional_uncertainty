@@ -141,5 +141,6 @@ class IdentityScaler:
     def fit(self, X):
         self.local_max_ = np.max(X, axis=0)
         return self
+
     def transform(self, X):
         return X
