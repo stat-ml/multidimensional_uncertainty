@@ -208,7 +208,7 @@ def main(
 if __name__ == "__main__":
     seed = 42
     # UNCERTAINTY_MEASURES = MAHALANOBIS_AND_BAYES_RISK # + BAYES_RISK_AND_BAYES_RISK + EXCESSES_DIFFERENT_INSTANTIATIONS
-    UNCERTAINTY_MEASURES = EXCESSES_DIFFERENT_APPROXIMATIONS_LOGSCORE
+    UNCERTAINTY_MEASURES = ADDITIVE_TOTALS # CORRESPONDING_COMPONENTS_TO_ADDITIVE_TOTALS ADDITIVE_TOTALS
     print(UNCERTAINTY_MEASURES)
     device = (
         torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -221,11 +221,11 @@ if __name__ == "__main__":
         [15, 16, 17, 18, 19],
     ]
 
-    ind_dataset = DatasetName.CIFAR10.value
-    ood_dataset = DatasetName.CIFAR100.value
+    ind_dataset = DatasetName.TINY_IMAGENET.value
+    ood_dataset = DatasetName.IMAGENET_O.value
     weights_root = "./resources/model_weights"
 
-    target = OTTarget.EXP
+    target = OTTarget.BETA
     sampling_method = SamplingMethod.GRID
     scaling_type = ScalingType.FEATURE_WISE
     grid_size = 5

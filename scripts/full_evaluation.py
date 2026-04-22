@@ -45,19 +45,23 @@ datasets_ood_tiny_imagenet_ = [
 uncertainty_types = [
     UncertaintyType.RISK,
     UncertaintyType.MAHALANOBIS,
-    UncertaintyType.GMM,
+    # UncertaintyType.GMM,
 ]
 gnames = [
     GName.LOG_SCORE,
-    GName.BRIER_SCORE,
-    GName.ZERO_ONE_SCORE,
-    GName.SPHERICAL_SCORE,
+    # GName.BRIER_SCORE,
+    # GName.ZERO_ONE_SCORE,
+    # GName.SPHERICAL_SCORE,
 ]
-risk_types = [RiskType.TOTAL_RISK, RiskType.EXCESS_RISK, RiskType.BAYES_RISK]
+risk_types = [
+    RiskType.TOTAL_RISK, 
+    RiskType.EXCESS_RISK, 
+    RiskType.BAYES_RISK
+    ]
 approximations = [
     ApproximationType.OUTER,
-    ApproximationType.INNER,
-    ApproximationType.CENTRAL,
+    # ApproximationType.INNER,
+    # ApproximationType.CENTRAL,
 ]
 
 

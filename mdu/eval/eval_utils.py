@@ -400,9 +400,6 @@ def process_uncertainty_measure(
             ind_test_scores = uncertainty_data["ind_test"][
                 group_idx, 0, :
             ]  # Shape: (n_test_samples,)
-            ind_calib_scores = uncertainty_data["ind_calib"][
-                group_idx, 0, :
-            ]  # Shape: (n_calib_samples,)
             ood_scores = uncertainty_data["ood"][
                 group_idx, 0, :
             ]  # Shape: (n_ood_samples,)
@@ -578,7 +575,8 @@ def process_multidimensional_composition(
 
             for uncertainty_data in uncertainty_datasets:
                 ind_test_scores = uncertainty_data["ind_test"][group_idx, 0, :]
-                ind_calib_scores = uncertainty_data["ind_calib"][group_idx, 0, :]
+                ind_calib_shape_ = uncertainty_data["ind_calib"][group_idx, 0, :].shape[-1]
+                ind_calib_scores = uncertainty_data["ind_calib"][group_idx, 0, : int(0.005 * ind_calib_shape_)]
                 ood_scores = uncertainty_data["ood"][group_idx, 0, :]
 
                 uncertainty_matrix_ind.append(ind_test_scores)
@@ -605,6 +603,7 @@ def process_multidimensional_composition(
             )
 
             try:
+                # print(ind_dataset, uncertainty_matrix_calib.shape)
                 model.fit(uncertainty_matrix_calib)
 
                 uncertainty_scores_ind = model.predict(uncertainty_matrix_ind)

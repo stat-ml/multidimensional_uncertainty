@@ -54,28 +54,28 @@ ADDITIVE_TOTALS = [
             "T": 1.0,
         },
     },
-    {
-        "type": UncertaintyType.RISK,
-        "print_name": "TOT 1 1 (brier)",
-        "kwargs": {
-            "g_name": GName.BRIER_SCORE,
-            "risk_type": RiskType.TOTAL_RISK,
-            "gt_approx": ApproximationType.OUTER,
-            "pred_approx": ApproximationType.OUTER,
-            "T": 1.0,
-        },
-    },
-    {
-        "type": UncertaintyType.RISK,
-        "print_name": "TOT 1 1 (sph)",
-        "kwargs": {
-            "g_name": GName.SPHERICAL_SCORE,
-            "risk_type": RiskType.TOTAL_RISK,
-            "gt_approx": ApproximationType.OUTER,
-            "pred_approx": ApproximationType.OUTER,
-            "T": 1.0,
-        },
-    },
+    # {
+    #     "type": UncertaintyType.RISK,
+    #     "print_name": "TOT 1 1 (brier)",
+    #     "kwargs": {
+    #         "g_name": GName.BRIER_SCORE,
+    #         "risk_type": RiskType.TOTAL_RISK,
+    #         "gt_approx": ApproximationType.OUTER,
+    #         "pred_approx": ApproximationType.OUTER,
+    #         "T": 1.0,
+    #     },
+    # },
+    # {
+    #     "type": UncertaintyType.RISK,
+    #     "print_name": "TOT 1 1 (sph)",
+    #     "kwargs": {
+    #         "g_name": GName.SPHERICAL_SCORE,
+    #         "risk_type": RiskType.TOTAL_RISK,
+    #         "gt_approx": ApproximationType.OUTER,
+    #         "pred_approx": ApproximationType.OUTER,
+    #         "T": 1.0,
+    #     },
+    # },
     # {
     #     "type": UncertaintyType.RISK,
     #     "print_name": "TOT 1 1 (zero-one)",
@@ -138,27 +138,27 @@ ADDITIVE_TOTALS_1_2 = [
 
 
 CORRESPONDING_COMPONENTS_TO_ADDITIVE_TOTALS = [
-    # {
-    #     "type": UncertaintyType.RISK,
-    #     "print_name": "EXC 1 1 (log)",
-    #     "kwargs": {
-    #         "g_name": GName.LOG_SCORE,
-    #         "risk_type": RiskType.EXCESS_RISK,
-    #         "gt_approx": ApproximationType.OUTER,
-    #         "pred_approx": ApproximationType.OUTER,
-    #         "T": 1.0,
-    #     },
-    # },
-    # {
-    #     "type": UncertaintyType.RISK,
-    #     "print_name": "BAYES 1 (log)",
-    #     "kwargs": {
-    #         "g_name": GName.LOG_SCORE,
-    #         "risk_type": RiskType.BAYES_RISK,
-    #         "gt_approx": ApproximationType.OUTER,
-    #         "T": 1.0,
-    #     },
-    # },
+    {
+        "type": UncertaintyType.RISK,
+        "print_name": "EXC 1 1 (log)",
+        "kwargs": {
+            "g_name": GName.LOG_SCORE,
+            "risk_type": RiskType.EXCESS_RISK,
+            "gt_approx": ApproximationType.OUTER,
+            "pred_approx": ApproximationType.OUTER,
+            "T": 1.0,
+        },
+    },
+    {
+        "type": UncertaintyType.RISK,
+        "print_name": "BAYES 1 (log)",
+        "kwargs": {
+            "g_name": GName.LOG_SCORE,
+            "risk_type": RiskType.BAYES_RISK,
+            "gt_approx": ApproximationType.OUTER,
+            "T": 1.0,
+        },
+    },
     # {
     #     "type": UncertaintyType.RISK,
     #     "print_name": "EXC 1 1 (brier)",
@@ -201,27 +201,27 @@ CORRESPONDING_COMPONENTS_TO_ADDITIVE_TOTALS = [
     #         "T": 1.0,
     #     },
     # },
-    {
-        "type": UncertaintyType.RISK,
-        "print_name": "EXC 1 1 (zero-one)",
-        "kwargs": {
-            "g_name": GName.ZERO_ONE_SCORE,
-            "risk_type": RiskType.EXCESS_RISK,
-            "gt_approx": ApproximationType.OUTER,
-            "pred_approx": ApproximationType.OUTER,
-            "T": 1.0,
-        },
-    },
-    {
-        "type": UncertaintyType.RISK,
-        "print_name": "BAYES 1 (zero-one)",
-        "kwargs": {
-            "g_name": GName.ZERO_ONE_SCORE,
-            "risk_type": RiskType.BAYES_RISK,
-            "gt_approx": ApproximationType.OUTER,
-            "T": 1.0,
-        },
-    },
+    # {
+    #     "type": UncertaintyType.RISK,
+    #     "print_name": "EXC 1 1 (zero-one)",
+    #     "kwargs": {
+    #         "g_name": GName.ZERO_ONE_SCORE,
+    #         "risk_type": RiskType.EXCESS_RISK,
+    #         "gt_approx": ApproximationType.OUTER,
+    #         "pred_approx": ApproximationType.OUTER,
+    #         "T": 1.0,
+    #     },
+    # },
+    # {
+    #     "type": UncertaintyType.RISK,
+    #     "print_name": "BAYES 1 (zero-one)",
+    #     "kwargs": {
+    #         "g_name": GName.ZERO_ONE_SCORE,
+    #         "risk_type": RiskType.BAYES_RISK,
+    #         "gt_approx": ApproximationType.OUTER,
+    #         "T": 1.0,
+    #     },
+    # },
 ]
 
 

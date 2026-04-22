@@ -1,0 +1,1 @@
+uv run python scripts/full_evaluation.py --entropic_target Beta --entropic_eps 0.5 --entropic_grid_size 0 --entropic_scaling_type FeatureWise --output_file ./resources/refactored/calibration_001.csv --verbose
