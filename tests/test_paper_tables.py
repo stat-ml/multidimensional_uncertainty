@@ -125,6 +125,11 @@ class PaperTablesTest(unittest.TestCase):
         self.assertIn(DEFAULT_AVERAGE_ROW, bundle.problem_mean_tables["ood_detection"].index)
         self.assertIn("average_rank", bundle.average_ranks.columns)
         self.assertFalse(bundle.measure_summary.empty)
+        self.assertFalse(bundle.pareto_summary.empty)
+        self.assertEqual(
+            set(bundle.pareto_summary["aggregation"]),
+            {"EntropicOT", "PCA", "Additive"},
+        )
 
         composition_table = bundle.composition_mean_tables[COMPOSITION][
             "ood_detection"
@@ -151,6 +156,7 @@ class PaperTablesTest(unittest.TestCase):
             self.assertFalse(bundle.average_ranks.empty)
             self.assertTrue((output_dir / "all_tasks_mean.csv").exists())
             self.assertTrue((output_dir / "average_ranks.csv").exists())
+            self.assertTrue((output_dir / "pareto_summary.csv").exists())
             self.assertTrue(
                 (output_dir / "problem_tables" / "ood_detection_mean.csv").exists()
             )

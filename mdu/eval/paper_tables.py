@@ -8,6 +8,7 @@ import pandas as pd
 
 from configs.interesting_compositions import INTERESTING_COMPOSITIONS
 from mdu.eval.table_analysis_utils import (
+    analyze_composite_pareto_performance,
     compute_average_ranks,
     select_composite_and_components,
     transform_by_tasks,
@@ -33,6 +34,7 @@ class PaperTableBundle:
     problem_latex_tables: Dict[str, pd.DataFrame]
     average_ranks: pd.DataFrame
     measure_summary: pd.DataFrame
+    pareto_summary: pd.DataFrame
     composition_mean_tables: Dict[str, Dict[str, pd.DataFrame]]
     composition_std_tables: Dict[str, Dict[str, pd.DataFrame]]
     composition_latex_tables: Dict[str, Dict[str, pd.DataFrame]]
@@ -81,15 +83,15 @@ def build_paper_tables(
     average_ranks.insert(0, "rank_position", range(1, len(average_ranks) + 1))
 
     measure_summary = summarize_problem_tables(problem_mean_tables)
+    if composition_names is None:
+        composition_names = list(INTERESTING_COMPOSITIONS)
+    pareto_summary = build_pareto_summary(mean_table, composition_names)
 
     composition_mean_tables: Dict[str, Dict[str, pd.DataFrame]] = {}
     composition_std_tables: Dict[str, Dict[str, pd.DataFrame]] = {}
     composition_latex_tables: Dict[str, Dict[str, pd.DataFrame]] = {}
 
     if include_composition_tables:
-        if composition_names is None:
-            composition_names = list(INTERESTING_COMPOSITIONS)
-
         for composition_name in composition_names:
             mean_subset = select_composition_columns(mean_table, composition_name)
             if mean_subset.empty:
@@ -125,6 +127,7 @@ def build_paper_tables(
         problem_latex_tables=problem_latex_tables,
         average_ranks=average_ranks,
         measure_summary=measure_summary,
+        pareto_summary=pareto_summary,
         composition_mean_tables=composition_mean_tables,
         composition_std_tables=composition_std_tables,
         composition_latex_tables=composition_latex_tables,
@@ -273,6 +276,65 @@ def select_composition_columns(
     return selected
 
 
+def build_pareto_summary(
+    transformed_table: pd.DataFrame,
+    composition_names: Sequence[str],
+) -> pd.DataFrame:
+    """Build article Pareto-front summary for EntropicOT, PCA, and additive."""
+    selected_compositions = {
+        name: INTERESTING_COMPOSITIONS[name]
+        for name in composition_names
+        if name in INTERESTING_COMPOSITIONS
+    }
+    pareto_results = analyze_composite_pareto_performance(
+        transformed_table,
+        selected_compositions,
+    )
+
+    rows = []
+    for result_name, result in pareto_results.items():
+        aggregation_type, composition_name = split_pareto_result_name(result_name)
+        rows.append(
+            {
+                "aggregation": aggregation_type,
+                "composition": composition_name,
+                "result_name": result_name,
+                "pareto_count": result["pareto_count"],
+                "total_problems": result["total_problems"],
+                "pareto_percentage": result["pareto_percentage"],
+                "average_pareto_depth": result["average_pareto_depth"],
+                "median_pareto_depth": result["median_pareto_depth"],
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "aggregation",
+                "composition",
+                "result_name",
+                "pareto_count",
+                "total_problems",
+                "pareto_percentage",
+                "average_pareto_depth",
+                "median_pareto_depth",
+            ]
+        )
+
+    return pd.DataFrame(rows).sort_values(
+        ["pareto_percentage", "pareto_count"],
+        ascending=[False, False],
+    )
+
+
+def split_pareto_result_name(result_name: str) -> tuple[str, str]:
+    if result_name.startswith("PCA "):
+        return "PCA", result_name.removeprefix("PCA ")
+    if result_name.startswith("Additive "):
+        return "Additive", result_name.removeprefix("Additive ")
+    return "EntropicOT", result_name
+
+
 def write_paper_tables(
     bundle: PaperTableBundle,
     output_dir: str | Path,
@@ -293,6 +355,7 @@ def write_paper_tables(
     bundle.all_tasks_std.to_csv(output_path / "all_tasks_std.csv")
     bundle.average_ranks.to_csv(output_path / "average_ranks.csv", index=False)
     bundle.measure_summary.to_csv(output_path / "measure_summary.csv", index=False)
+    bundle.pareto_summary.to_csv(output_path / "pareto_summary.csv", index=False)
 
     for problem_type, table in bundle.problem_mean_tables.items():
         table.to_csv(problem_dir / f"{problem_type}_mean.csv")
