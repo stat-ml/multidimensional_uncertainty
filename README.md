@@ -77,6 +77,27 @@ Use `--skip_pca_baseline` if you want only the old EntropicOT composition
 results without PCA. Use `--skip_additive_baseline` to disable the naive
 summation baseline.
 
+5. Build article tables from the full evaluation CSV:
+
+```bash
+uv run python scripts/build_paper_tables.py \
+  --input_csv ./resources/refactored/results.csv \
+  --output_dir ./resources/paper_tables
+```
+
+This writes:
+
+- `all_tasks_mean.csv` and `all_tasks_std.csv`;
+- OOD, misclassification, and selective prediction tables under
+  `resources/paper_tables/problem_tables`;
+- LaTeX tables under `resources/paper_tables/latex`;
+- per-composition tables with components plus EntropicOT, PCA, and additive
+  baselines under `resources/paper_tables/composition_tables`;
+- `average_ranks.csv` and `measure_summary.csv`.
+
+There is also a thin notebook wrapper at `notebooks/paper_tables.ipynb` if you
+want to inspect the generated tables interactively.
+
 ## Aggregators
 
 `mdu/unc/entropic_ot.py` contains `EntropicOTOrdering`. It fits an entropic OT
@@ -136,5 +157,7 @@ For a quick syntax check of the main scripts:
 uv run python -m py_compile \
   scripts/full_evaluation.py \
   scripts/compute_measures_1d.py \
-  scripts/compose_multidimensional_scores.py
+  scripts/compose_multidimensional_scores.py \
+  scripts/build_paper_tables.py \
+  scripts/main_toy.py
 ```
