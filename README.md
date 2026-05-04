@@ -69,10 +69,13 @@ By default this evaluates:
 
 - every individual 1D measure;
 - every configured composition with EntropicOT (`uncertainty_type=EntropicOT`);
-- every configured composition with the PCA baseline (`uncertainty_type=PCA`).
+- every configured composition with the PCA baseline (`uncertainty_type=PCA`);
+- every configured composition with the additive baseline
+  (`uncertainty_type=Additive`).
 
 Use `--skip_pca_baseline` if you want only the old EntropicOT composition
-results.
+results without PCA. Use `--skip_additive_baseline` to disable the naive
+summation baseline.
 
 ## Aggregators
 
@@ -86,7 +89,11 @@ uses the first component as a scalar baseline. The component sign is oriented so
 that larger values correspond to larger overall uncertainty when the component
 loadings have positive total direction.
 
-Both aggregators expose the same minimal API:
+`mdu/unc/additive_baseline.py` contains `AdditiveUncertaintyOrdering`. It is the
+most naive baseline: no scaling, no learned weights, just the raw sum of all
+component uncertainty scores in the vector.
+
+All aggregators expose the same minimal API:
 
 ```python
 model.fit(scores_cal)
@@ -94,6 +101,18 @@ scores = model.predict(scores_test)
 ```
 
 where `scores_cal` and `scores_test` have shape `(n_samples, n_measures)`.
+
+## Toy Experiment
+
+`scripts/main_toy.py` trains a small shallow network on synthetic 2D blobs,
+computes the configured 1D uncertainty measures on a grid, and visualizes:
+
+- the individual 1D component scores;
+- VecUQ-OT (`multidim_scores`);
+- PCA (`pca_scores`);
+- additive summation (`additive_scores`).
+
+The plots are written to `resources/pics`.
 
 ## Tests
 
@@ -105,9 +124,11 @@ uv run python -m unittest discover
 
 It checks:
 
+- additive baseline summation behavior and shape validation;
 - PCA baseline shape, ordering, sign orientation, and constant-input behavior;
 - 1D EntropicOT ordering behavior against rank/CDF-like expectations;
-- evaluator smoke tests on fake `.npz`-shaped inputs for EntropicOT and PCA.
+- evaluator smoke tests on fake `.npz`-shaped inputs for EntropicOT, PCA, and
+  additive baselines.
 
 For a quick syntax check of the main scripts:
 

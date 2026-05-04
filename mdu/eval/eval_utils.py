@@ -14,6 +14,7 @@ from sklearn.metrics import (
 )
 from mdu.data.data_utils import split_dataset_indices
 from mdu.unc.entropic_ot import EntropicOTOrdering
+from mdu.unc.additive_baseline import AdditiveUncertaintyOrdering
 from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 from mdu.unc.constants import ScalingType, OTTarget, SamplingMethod
 
@@ -399,6 +400,49 @@ def _base_result_row(
     }
 
 
+def _empty_metric_fields():
+    return {
+        "roc_auc": None,
+        "average_precision": None,
+        "accuracy": None,
+        "aurc": None,
+        "acc_cov_auc": None,
+        "coverage_at_1pct_error": None,
+        "coverage_at_2pct_error": None,
+        "coverage_at_5pct_error": None,
+        "n_ind_samples": None,
+        "n_ood_samples": None,
+        "n_correct": None,
+        "n_incorrect": None,
+    }
+
+
+def _evaluation_row(
+    ind_dataset,
+    ood_dataset,
+    measure,
+    uncertainty_type,
+    group_idx,
+    problem_type,
+    group_data,
+    metadata,
+    metrics,
+):
+    row = _base_result_row(
+        ind_dataset,
+        ood_dataset,
+        measure,
+        uncertainty_type,
+        group_idx,
+        problem_type,
+        group_data,
+        metadata,
+    )
+    row.update(_empty_metric_fields())
+    row.update(metrics)
+    return row
+
+
 def append_uncertainty_evaluation_rows(
     ind_dataset,
     ood_dataset,
@@ -421,33 +465,23 @@ def append_uncertainty_evaluation_rows(
         ood_metrics = compute_ood_detection_metrics(
             uncertainty_scores_ind, uncertainty_scores_ood
         )
-        row = _base_result_row(
-            ind_dataset,
-            ood_dataset,
-            measure,
-            uncertainty_type,
-            group_idx,
-            "ood_detection",
-            group_data,
-            metadata,
+        results.append(
+            _evaluation_row(
+                ind_dataset,
+                ood_dataset,
+                measure,
+                uncertainty_type,
+                group_idx,
+                "ood_detection",
+                group_data,
+                metadata,
+                {
+                    "roc_auc": ood_metrics["roc_auc"],
+                    "n_ind_samples": ood_metrics["n_ind_samples"],
+                    "n_ood_samples": ood_metrics["n_ood_samples"],
+                },
+            )
         )
-        row.update(
-            {
-                "roc_auc": ood_metrics["roc_auc"],
-                "average_precision": None,
-                "accuracy": None,
-                "aurc": None,
-                "acc_cov_auc": None,
-                "coverage_at_1pct_error": None,
-                "coverage_at_2pct_error": None,
-                "coverage_at_5pct_error": None,
-                "n_ind_samples": ood_metrics["n_ind_samples"],
-                "n_ood_samples": ood_metrics["n_ood_samples"],
-                "n_correct": None,
-                "n_incorrect": None,
-            }
-        )
-        results.append(row)
 
     same_dataset_key = (ind_dataset, measure, group_idx)
     if same_dataset_key in processed_same_dataset:
@@ -457,64 +491,51 @@ def append_uncertainty_evaluation_rows(
     misc_metrics = compute_misclassification_detection_metrics(
         uncertainty_scores_ind, y_pred, y_test
     )
-    row = _base_result_row(
-        ind_dataset,
-        ind_dataset,
-        measure,
-        uncertainty_type,
-        group_idx,
-        "misclassification_detection",
-        group_data,
-        metadata,
+    results.append(
+        _evaluation_row(
+            ind_dataset,
+            ind_dataset,
+            measure,
+            uncertainty_type,
+            group_idx,
+            "misclassification_detection",
+            group_data,
+            metadata,
+            {
+                "roc_auc": misc_metrics["roc_auc"],
+                "average_precision": misc_metrics["average_precision"],
+                "accuracy": misc_metrics["accuracy"],
+                "n_ind_samples": len(uncertainty_scores_ind),
+                "n_correct": misc_metrics["n_correct"],
+                "n_incorrect": misc_metrics["n_incorrect"],
+            },
+        )
     )
-    row.update(
-        {
-            "roc_auc": misc_metrics["roc_auc"],
-            "average_precision": misc_metrics["average_precision"],
-            "accuracy": misc_metrics["accuracy"],
-            "aurc": None,
-            "acc_cov_auc": None,
-            "coverage_at_1pct_error": None,
-            "coverage_at_2pct_error": None,
-            "coverage_at_5pct_error": None,
-            "n_ind_samples": len(uncertainty_scores_ind),
-            "n_ood_samples": None,
-            "n_correct": misc_metrics["n_correct"],
-            "n_incorrect": misc_metrics["n_incorrect"],
-        }
-    )
-    results.append(row)
 
     sel_metrics = compute_selective_prediction_metrics(
         uncertainty_scores_ind, y_pred, y_test
     )
-    row = _base_result_row(
-        ind_dataset,
-        ind_dataset,
-        measure,
-        uncertainty_type,
-        group_idx,
-        "selective_prediction",
-        group_data,
-        metadata,
+    results.append(
+        _evaluation_row(
+            ind_dataset,
+            ind_dataset,
+            measure,
+            uncertainty_type,
+            group_idx,
+            "selective_prediction",
+            group_data,
+            metadata,
+            {
+                "accuracy": sel_metrics["overall_accuracy"],
+                "aurc": sel_metrics["aurc"],
+                "acc_cov_auc": sel_metrics["acc_cov_auc"],
+                "coverage_at_1pct_error": sel_metrics["coverage_at_1pct_error"],
+                "coverage_at_2pct_error": sel_metrics["coverage_at_2pct_error"],
+                "coverage_at_5pct_error": sel_metrics["coverage_at_5pct_error"],
+                "n_ind_samples": sel_metrics["n_samples"],
+            },
+        )
     )
-    row.update(
-        {
-            "roc_auc": None,
-            "average_precision": None,
-            "accuracy": sel_metrics["overall_accuracy"],
-            "aurc": sel_metrics["aurc"],
-            "acc_cov_auc": sel_metrics["acc_cov_auc"],
-            "coverage_at_1pct_error": sel_metrics["coverage_at_1pct_error"],
-            "coverage_at_2pct_error": sel_metrics["coverage_at_2pct_error"],
-            "coverage_at_5pct_error": sel_metrics["coverage_at_5pct_error"],
-            "n_ind_samples": sel_metrics["n_samples"],
-            "n_ood_samples": None,
-            "n_correct": None,
-            "n_incorrect": None,
-        }
-    )
-    results.append(row)
 
 
 def process_uncertainty_measure(
@@ -768,6 +789,32 @@ def process_pca_composition(
         model_factory=PCAUncertaintyOrdering,
         measure_name=f"PCA {composition_name}",
         uncertainty_type="PCA",
+    )
+
+
+def process_additive_composition(
+    composition_name,
+    configs,
+    ind_dataset,
+    ood_dataset,
+    prediction_data,
+    results,
+    args,
+    processed_same_dataset,
+):
+    """Process one multidimensional composition using raw score summation."""
+    _process_composition_with_ordering(
+        composition_name=composition_name,
+        configs=configs,
+        ind_dataset=ind_dataset,
+        ood_dataset=ood_dataset,
+        prediction_data=prediction_data,
+        results=results,
+        args=args,
+        processed_same_dataset=processed_same_dataset,
+        model_factory=AdditiveUncertaintyOrdering,
+        measure_name=f"Additive {composition_name}",
+        uncertainty_type="Additive",
     )
 
 

@@ -29,6 +29,11 @@ def get_args():
         action="store_true",
         help="Skip PCA baselines for multidimensional compositions",
     )
+    parser.add_argument(
+        "--skip_additive_baseline",
+        action="store_true",
+        help="Skip additive baselines for multidimensional compositions",
+    )
 
     # EntropicOT hyperparameters
     parser.add_argument(

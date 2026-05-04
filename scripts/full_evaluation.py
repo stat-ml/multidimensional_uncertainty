@@ -20,6 +20,7 @@ from configs.interesting_compositions import INTERESTING_COMPOSITIONS
 from mdu.eval.eval_utils import (
     create_output_filename,
     load_predictions_and_split,
+    process_additive_composition,
     process_multidimensional_composition,
     process_pca_composition,
     process_uncertainty_measure,
@@ -102,6 +103,8 @@ def main():
             # Add multidimensional compositions
             total_combinations += len(INTERESTING_COMPOSITIONS)
             if not args.skip_pca_baseline:
+                total_combinations += len(INTERESTING_COMPOSITIONS)
+            if not args.skip_additive_baseline:
                 total_combinations += len(INTERESTING_COMPOSITIONS)
 
     pbar = tqdm(total=total_combinations, desc="Processing combinations")
@@ -191,6 +194,19 @@ def main():
                     pbar.update(1)
                 if not args.skip_pca_baseline:
                     process_pca_composition(
+                        composition_name,
+                        configs,
+                        ind_dataset,
+                        ood_dataset,
+                        prediction_data,
+                        results,
+                        args,
+                        processed_same_dataset,
+                    )
+                    if pbar is not None:
+                        pbar.update(1)
+                if not args.skip_additive_baseline:
+                    process_additive_composition(
                         composition_name,
                         configs,
                         ind_dataset,

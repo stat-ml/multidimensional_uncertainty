@@ -8,6 +8,7 @@ import numpy as np
 from mdu.data.constants import DatasetName
 from mdu.eval.eval_utils import (
     get_results_path,
+    process_additive_composition,
     process_multidimensional_composition,
     process_pca_composition,
 )
@@ -85,6 +86,7 @@ class CompositionEvaluatorTest(unittest.TestCase):
 
             entropic_results = []
             pca_results = []
+            additive_results = []
             process_multidimensional_composition(
                 "TEST COMPOSITION",
                 COMPOSITION_CONFIGS,
@@ -105,15 +107,39 @@ class CompositionEvaluatorTest(unittest.TestCase):
                 args,
                 set(),
             )
+            process_additive_composition(
+                "TEST COMPOSITION",
+                COMPOSITION_CONFIGS,
+                DatasetName.CIFAR10,
+                DatasetName.CIFAR100,
+                prediction_data,
+                additive_results,
+                args,
+                set(),
+            )
 
             self.assertEqual(len(entropic_results), 3)
             self.assertEqual(len(pca_results), 3)
+            self.assertEqual(len(additive_results), 3)
             self.assertEqual(set(entropic_results[0]), set(pca_results[0]))
+            self.assertEqual(set(entropic_results[0]), set(additive_results[0]))
             self.assertTrue(
                 all(row["uncertainty_type"] == "PCA" for row in pca_results)
             )
             self.assertTrue(
                 all(row["measure"] == "PCA TEST COMPOSITION" for row in pca_results)
+            )
+            self.assertTrue(
+                all(
+                    row["uncertainty_type"] == "Additive"
+                    for row in additive_results
+                )
+            )
+            self.assertTrue(
+                all(
+                    row["measure"] == "Additive TEST COMPOSITION"
+                    for row in additive_results
+                )
             )
 
     def test_same_dataset_rows_are_not_duplicated_across_ood_pairs(self):
