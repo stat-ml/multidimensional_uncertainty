@@ -19,6 +19,12 @@ from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 from mdu.unc.constants import ScalingType, OTTarget, SamplingMethod
 
 
+def _trapezoid(y, x):
+    if hasattr(np, "trapezoid"):
+        return np.trapezoid(y, x)
+    return np.trapz(y, x)
+
+
 def load_pickle(file_path: str) -> Any:
     with open(file_path, "rb") as f:
         data = pickle.load(f)
@@ -229,10 +235,10 @@ def compute_selective_prediction_metrics(uncertainty_scores, y_pred, y_true):
     risk = 1 - accuracy  # Risk = 1 - Accuracy
 
     # Compute AURC (Area Under Risk-Coverage curve) - lower is better
-    aurc = np.trapezoid(risk, coverage)
+    aurc = _trapezoid(risk, coverage)
 
     # Compute AUC for accuracy-coverage curve - higher is better
-    acc_cov_auc = np.trapezoid(accuracy, coverage)
+    acc_cov_auc = _trapezoid(accuracy, coverage)
 
     # Compute coverage at different error rates
     coverage_at_error = {}

@@ -3,17 +3,27 @@ name = "multidimensional-uncertainty"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "ipykernel>=6.30.0",
     "ipython>=9.3.0",
     "jupyterlab>=4.4.5",
+    "lm-polygraph @ git+https://github.com/IINemo/lm-polygraph.git@218eb5d16e1e05f891124501461127845b9c118e",
     "matplotlib>=3.10.3",
-    "numpy>=2.3.0",
+    "numpy>=1.26,<2",
     "pot>=0.9.5",
     "scikit-learn>=1.7.0",
     "seaborn>=0.13.2",
     "torch==2.2.2 ; platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "torch>=2.7.1 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    "torch==2.5 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    "transformers==4.49",
     "tqdm>=4.67.1",
 ]
+
+[tool.uv]
+# lm-polygraph pulls bitsandbytes, which has no macOS wheel and is not needed
+# for the LLM result-table notebooks.
+exclude-dependencies = ["bitsandbytes"]
+# unbabel-comet pins sentencepiece<0.2, but that old release has no Python 3.12
+# macOS wheel. The newer wheel works for the notebook/runtime imports we use.
+override-dependencies = ["sentencepiece>=0.2.0"]
