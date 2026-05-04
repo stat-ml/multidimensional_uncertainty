@@ -98,6 +98,24 @@ This writes:
 There is also a thin notebook wrapper at `notebooks/paper_tables.ipynb` if you
 want to inspect the generated tables interactively.
 
+6. Find cases where one aggregation clearly wins and the others trail:
+
+```bash
+uv run python scripts/find_aggregation_contrasts.py \
+  --input_csv ./resources/refactored/results.csv \
+  --output_dir ./resources/paper_tables/aggregation_contrasts \
+  --min_gap 0.05 \
+  --min_broken 2
+```
+
+This compares EntropicOT, PCA, and additive aggregation for each composition and
+task row. A row is selected when the winner beats at least `--min_broken` other
+aggregations by at least `--min_gap`. The script writes `contrast_cases.csv`,
+summary CSVs, and small selected tables under
+`resources/paper_tables/aggregation_contrasts`. Use
+`notebooks/aggregation_contrast_insights.ipynb` to inspect where each
+aggregation tends to break.
+
 ## Aggregators
 
 `mdu/unc/entropic_ot.py` contains `EntropicOTOrdering`. It fits an entropic OT
@@ -159,5 +177,6 @@ uv run python -m py_compile \
   scripts/compute_measures_1d.py \
   scripts/compose_multidimensional_scores.py \
   scripts/build_paper_tables.py \
+  scripts/find_aggregation_contrasts.py \
   scripts/main_toy.py
 ```
