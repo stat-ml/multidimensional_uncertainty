@@ -31,10 +31,12 @@ from mdu.data.constants import DatasetName
 from mdu.data.data_utils import split_dataset_indices
 from mdu.eval.eval_utils import load_pickle
 from mdu.randomness import set_all_seeds
+from mdu.unc.additive_baseline import AdditiveUncertaintyOrdering
 from mdu.unc.constants import OTTarget, SamplingMethod, ScalingType
 from mdu.unc.entropic_ot import EntropicOTOrdering
 from mdu.unc.multidimensional_uncertainty import (
     fit_and_apply_uncertainty_estimators, pretty_compute_all_uncertainties)
+from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 
 
 def main(
@@ -111,6 +113,8 @@ def main(
             random_state=seed,
             tol=tol,
         )
+        pca_uncertainty = PCAUncertaintyOrdering()
+        additive_uncertainty = AdditiveUncertaintyOrdering()
 
         uncertainty_scores_calib, fitted_uncertainty_estimators = (
             fit_and_apply_uncertainty_estimators(
@@ -144,12 +148,26 @@ def main(
         multi_dim_uncertainty.fit(
             scores_cal=scores_calib,
         )
+        pca_uncertainty.fit(scores_calib)
+        additive_uncertainty.fit(scores_calib)
 
         uncertainty_scores_list_ind.append(
             ("multidim_scores", multi_dim_uncertainty.predict(scores_ind))
         )
         uncertainty_scores_list_ood.append(
             ("multidim_scores", multi_dim_uncertainty.predict(scores_ood))
+        )
+        uncertainty_scores_list_ind.append(
+            ("pca_scores", pca_uncertainty.predict(scores_ind))
+        )
+        uncertainty_scores_list_ood.append(
+            ("pca_scores", pca_uncertainty.predict(scores_ood))
+        )
+        uncertainty_scores_list_ind.append(
+            ("additive_scores", additive_uncertainty.predict(scores_ind))
+        )
+        uncertainty_scores_list_ood.append(
+            ("additive_scores", additive_uncertainty.predict(scores_ood))
         )
 
         # Compute ROC AUC between in-distribution (class 0) and OOD (class 1) using sklearn
