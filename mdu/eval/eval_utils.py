@@ -2,7 +2,7 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 import pickle
-from typing import Any
+from typing import Any, Callable
 from mdu.unc.risk_metrics import RiskType, GName, ApproximationType
 from mdu.unc.constants import UncertaintyType
 from mdu.data.constants import DatasetName
@@ -14,6 +14,7 @@ from sklearn.metrics import (
 )
 from mdu.data.data_utils import split_dataset_indices
 from mdu.unc.entropic_ot import EntropicOTOrdering
+from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 from mdu.unc.constants import ScalingType, OTTarget, SamplingMethod
 
 
@@ -346,6 +347,176 @@ def load_uncertainty_data_for_config(config, ind_dataset, ood_dataset, results_r
     return np.load(path)
 
 
+def build_composition_uncertainty_matrices(uncertainty_datasets, group_idx):
+    """Stack component 1D scores into calibration, ID-test, and OOD matrices."""
+    uncertainty_matrix_ind = []
+    uncertainty_matrix_calib = []
+    uncertainty_matrix_ood = []
+
+    for uncertainty_data in uncertainty_datasets:
+        uncertainty_matrix_ind.append(uncertainty_data["ind_test"][group_idx, 0, :])
+        uncertainty_matrix_calib.append(uncertainty_data["ind_calib"][group_idx, 0, :])
+        uncertainty_matrix_ood.append(uncertainty_data["ood"][group_idx, 0, :])
+
+    return (
+        np.column_stack(uncertainty_matrix_ind),
+        np.column_stack(uncertainty_matrix_calib),
+        np.column_stack(uncertainty_matrix_ood),
+    )
+
+
+def _composition_row_metadata():
+    return {
+        "gname": None,
+        "risk_type": None,
+        "gt_approximation": None,
+        "pred_approximation": None,
+    }
+
+
+def _base_result_row(
+    ind_dataset,
+    ood_dataset,
+    measure,
+    uncertainty_type,
+    group_idx,
+    problem_type,
+    group_data,
+    metadata,
+):
+    return {
+        "ind_dataset": ind_dataset.value,
+        "ood_dataset": ood_dataset.value,
+        "measure": measure,
+        "uncertainty_type": uncertainty_type,
+        "gname": metadata["gname"],
+        "risk_type": metadata["risk_type"],
+        "gt_approximation": metadata["gt_approximation"],
+        "pred_approximation": metadata["pred_approximation"],
+        "ensemble_group": group_idx,
+        "problem_type": problem_type,
+        "ensemble_accuracy": group_data["ensemble_accuracy"],
+    }
+
+
+def append_uncertainty_evaluation_rows(
+    ind_dataset,
+    ood_dataset,
+    measure,
+    uncertainty_type,
+    uncertainty_scores_ind,
+    uncertainty_scores_ood,
+    group_idx,
+    group_data,
+    results,
+    processed_same_dataset,
+    metadata=None,
+):
+    """Append OOD, misclassification, and selective-prediction rows."""
+    metadata = metadata or _composition_row_metadata()
+    y_pred = group_data["y_pred"]
+    y_test = group_data["y_test"]
+
+    if ind_dataset != ood_dataset:
+        ood_metrics = compute_ood_detection_metrics(
+            uncertainty_scores_ind, uncertainty_scores_ood
+        )
+        row = _base_result_row(
+            ind_dataset,
+            ood_dataset,
+            measure,
+            uncertainty_type,
+            group_idx,
+            "ood_detection",
+            group_data,
+            metadata,
+        )
+        row.update(
+            {
+                "roc_auc": ood_metrics["roc_auc"],
+                "average_precision": None,
+                "accuracy": None,
+                "aurc": None,
+                "acc_cov_auc": None,
+                "coverage_at_1pct_error": None,
+                "coverage_at_2pct_error": None,
+                "coverage_at_5pct_error": None,
+                "n_ind_samples": ood_metrics["n_ind_samples"],
+                "n_ood_samples": ood_metrics["n_ood_samples"],
+                "n_correct": None,
+                "n_incorrect": None,
+            }
+        )
+        results.append(row)
+
+    same_dataset_key = (ind_dataset, measure, group_idx)
+    if same_dataset_key in processed_same_dataset:
+        return
+    processed_same_dataset.add(same_dataset_key)
+
+    misc_metrics = compute_misclassification_detection_metrics(
+        uncertainty_scores_ind, y_pred, y_test
+    )
+    row = _base_result_row(
+        ind_dataset,
+        ind_dataset,
+        measure,
+        uncertainty_type,
+        group_idx,
+        "misclassification_detection",
+        group_data,
+        metadata,
+    )
+    row.update(
+        {
+            "roc_auc": misc_metrics["roc_auc"],
+            "average_precision": misc_metrics["average_precision"],
+            "accuracy": misc_metrics["accuracy"],
+            "aurc": None,
+            "acc_cov_auc": None,
+            "coverage_at_1pct_error": None,
+            "coverage_at_2pct_error": None,
+            "coverage_at_5pct_error": None,
+            "n_ind_samples": len(uncertainty_scores_ind),
+            "n_ood_samples": None,
+            "n_correct": misc_metrics["n_correct"],
+            "n_incorrect": misc_metrics["n_incorrect"],
+        }
+    )
+    results.append(row)
+
+    sel_metrics = compute_selective_prediction_metrics(
+        uncertainty_scores_ind, y_pred, y_test
+    )
+    row = _base_result_row(
+        ind_dataset,
+        ind_dataset,
+        measure,
+        uncertainty_type,
+        group_idx,
+        "selective_prediction",
+        group_data,
+        metadata,
+    )
+    row.update(
+        {
+            "roc_auc": None,
+            "average_precision": None,
+            "accuracy": sel_metrics["overall_accuracy"],
+            "aurc": sel_metrics["aurc"],
+            "acc_cov_auc": sel_metrics["acc_cov_auc"],
+            "coverage_at_1pct_error": sel_metrics["coverage_at_1pct_error"],
+            "coverage_at_2pct_error": sel_metrics["coverage_at_2pct_error"],
+            "coverage_at_5pct_error": sel_metrics["coverage_at_5pct_error"],
+            "n_ind_samples": sel_metrics["n_samples"],
+            "n_ood_samples": None,
+            "n_correct": None,
+            "n_incorrect": None,
+        }
+    )
+    results.append(row)
+
+
 def process_uncertainty_measure(
     ind_dataset,
     ood_dataset,
@@ -548,9 +719,74 @@ def process_multidimensional_composition(
     processed_same_dataset,
 ):
     """Process one multidimensional composition using EntropicOTOrdering"""
+    _process_composition_with_ordering(
+        composition_name=composition_name,
+        configs=configs,
+        ind_dataset=ind_dataset,
+        ood_dataset=ood_dataset,
+        prediction_data=prediction_data,
+        results=results,
+        args=args,
+        processed_same_dataset=processed_same_dataset,
+        model_factory=lambda: EntropicOTOrdering(
+            target=OTTarget(args.entropic_target),
+            sampling_method=SamplingMethod(args.entropic_sampling_method),
+            scaling_type=ScalingType(args.entropic_scaling_type),
+            grid_size=args.entropic_grid_size,
+            target_params={},
+            eps=args.entropic_eps,
+            n_targets_multiplier=args.entropic_n_targets_multiplier,
+            max_iters=args.entropic_max_iters,
+            random_state=args.entropic_random_state,
+            tol=args.entropic_tol,
+        ),
+        measure_name=composition_name,
+        uncertainty_type="EntropicOT",
+    )
+
+
+def process_pca_composition(
+    composition_name,
+    configs,
+    ind_dataset,
+    ood_dataset,
+    prediction_data,
+    results,
+    args,
+    processed_same_dataset,
+):
+    """Process one multidimensional composition using PCA aggregation."""
+    _process_composition_with_ordering(
+        composition_name=composition_name,
+        configs=configs,
+        ind_dataset=ind_dataset,
+        ood_dataset=ood_dataset,
+        prediction_data=prediction_data,
+        results=results,
+        args=args,
+        processed_same_dataset=processed_same_dataset,
+        model_factory=PCAUncertaintyOrdering,
+        measure_name=f"PCA {composition_name}",
+        uncertainty_type="PCA",
+    )
+
+
+def _process_composition_with_ordering(
+    composition_name,
+    configs,
+    ind_dataset,
+    ood_dataset,
+    prediction_data,
+    results,
+    args,
+    processed_same_dataset,
+    model_factory: Callable[[], Any],
+    measure_name: str,
+    uncertainty_type: str,
+):
+    """Process one multidimensional composition with a fit/predict aggregator."""
 
     try:
-        # Load uncertainty data for all measures in the composition
         uncertainty_datasets = []
         for config in configs:
             uncertainty_data = load_uncertainty_data_for_config(
@@ -558,7 +794,6 @@ def process_multidimensional_composition(
             )
             uncertainty_datasets.append(uncertainty_data)
 
-        # Get prediction data
         pred_data = prediction_data.get(ind_dataset)
         if pred_data is None:
             if args.verbose:
@@ -567,173 +802,43 @@ def process_multidimensional_composition(
                 )
             return
 
-        # Process each ensemble group
         for group_key, group_data in pred_data.items():
-            group_idx = int(group_key.split("_")[1])  # Extract group index
-
-            # Collect uncertainty scores from all measures for this group
-            uncertainty_matrix_ind = []
-            uncertainty_matrix_calib = []
-            uncertainty_matrix_ood = []
-
-            for uncertainty_data in uncertainty_datasets:
-                ind_test_scores = uncertainty_data["ind_test"][group_idx, 0, :]
-                ind_calib_scores = uncertainty_data["ind_calib"][group_idx, 0, :]
-                ood_scores = uncertainty_data["ood"][group_idx, 0, :]
-
-                uncertainty_matrix_ind.append(ind_test_scores)
-                uncertainty_matrix_calib.append(ind_calib_scores)
-                uncertainty_matrix_ood.append(ood_scores)
-
-            # Stack to create matrices
-            uncertainty_matrix_ind = np.column_stack(uncertainty_matrix_ind)
-            uncertainty_matrix_calib = np.column_stack(uncertainty_matrix_calib)
-            uncertainty_matrix_ood = np.column_stack(uncertainty_matrix_ood)
-
-            # Fit EntropicOTOrdering on calibration data
-            model = EntropicOTOrdering(
-                target=OTTarget(args.entropic_target),
-                sampling_method=SamplingMethod(args.entropic_sampling_method),
-                scaling_type=ScalingType(args.entropic_scaling_type),
-                grid_size=args.entropic_grid_size,
-                target_params={},
-                eps=args.entropic_eps,
-                n_targets_multiplier=args.entropic_n_targets_multiplier,
-                max_iters=args.entropic_max_iters,
-                random_state=args.entropic_random_state,
-                tol=args.entropic_tol,
+            group_idx = int(group_key.split("_")[1])
+            (
+                uncertainty_matrix_ind,
+                uncertainty_matrix_calib,
+                uncertainty_matrix_ood,
+            ) = build_composition_uncertainty_matrices(
+                uncertainty_datasets, group_idx
             )
 
             try:
+                model = model_factory()
                 model.fit(uncertainty_matrix_calib)
-
                 uncertainty_scores_ind = model.predict(uncertainty_matrix_ind)
                 uncertainty_scores_ood = model.predict(uncertainty_matrix_ood)
 
-                # Get predictions and labels
-                y_pred = group_data["y_pred"]
-                y_test = group_data["y_test"]
-
-                # OOD Detection (different datasets)
-                if ind_dataset != ood_dataset:
-                    ood_metrics = compute_ood_detection_metrics(
-                        uncertainty_scores_ind, uncertainty_scores_ood
-                    )
-
-                    results.append(
-                        {
-                            "ind_dataset": ind_dataset.value,
-                            "ood_dataset": ood_dataset.value,
-                            "measure": composition_name,
-                            "uncertainty_type": "EntropicOT",
-                            "gname": None,
-                            "risk_type": None,
-                            "gt_approximation": None,
-                            "pred_approximation": None,
-                            "ensemble_group": group_idx,
-                            "problem_type": "ood_detection",
-                            "roc_auc": ood_metrics["roc_auc"],
-                            "average_precision": None,
-                            "accuracy": None,
-                            "aurc": None,
-                            "acc_cov_auc": None,
-                            "coverage_at_1pct_error": None,
-                            "coverage_at_2pct_error": None,
-                            "coverage_at_5pct_error": None,
-                            "n_ind_samples": ood_metrics["n_ind_samples"],
-                            "n_ood_samples": ood_metrics["n_ood_samples"],
-                            "n_correct": None,
-                            "n_incorrect": None,
-                            "ensemble_accuracy": group_data["ensemble_accuracy"],
-                        }
-                    )
-
-                # Same dataset evaluation (misclassification and selective prediction)
-                same_dataset_key = (ind_dataset, composition_name, group_idx)
-                if same_dataset_key not in processed_same_dataset:
-                    processed_same_dataset.add(same_dataset_key)
-
-                    # Misclassification detection
-                    misc_metrics = compute_misclassification_detection_metrics(
-                        uncertainty_scores_ind, y_pred, y_test
-                    )
-
-                    results.append(
-                        {
-                            "ind_dataset": ind_dataset.value,
-                            "ood_dataset": ind_dataset.value,
-                            "measure": composition_name,
-                            "uncertainty_type": "EntropicOT",
-                            "gname": None,
-                            "risk_type": None,
-                            "gt_approximation": None,
-                            "pred_approximation": None,
-                            "ensemble_group": group_idx,
-                            "problem_type": "misclassification_detection",
-                            "roc_auc": misc_metrics["roc_auc"],
-                            "average_precision": misc_metrics["average_precision"],
-                            "accuracy": misc_metrics["accuracy"],
-                            "aurc": None,
-                            "acc_cov_auc": None,
-                            "coverage_at_1pct_error": None,
-                            "coverage_at_2pct_error": None,
-                            "coverage_at_5pct_error": None,
-                            "n_ind_samples": len(uncertainty_scores_ind),
-                            "n_ood_samples": None,
-                            "n_correct": misc_metrics["n_correct"],
-                            "n_incorrect": misc_metrics["n_incorrect"],
-                            "ensemble_accuracy": group_data["ensemble_accuracy"],
-                        }
-                    )
-
-                    # Selective prediction
-                    sel_metrics = compute_selective_prediction_metrics(
-                        uncertainty_scores_ind, y_pred, y_test
-                    )
-
-                    results.append(
-                        {
-                            "ind_dataset": ind_dataset.value,
-                            "ood_dataset": ind_dataset.value,
-                            "measure": composition_name,
-                            "uncertainty_type": "EntropicOT",
-                            "gname": None,
-                            "risk_type": None,
-                            "gt_approximation": None,
-                            "pred_approximation": None,
-                            "ensemble_group": group_idx,
-                            "problem_type": "selective_prediction",
-                            "roc_auc": None,
-                            "average_precision": None,
-                            "accuracy": sel_metrics["overall_accuracy"],
-                            "aurc": sel_metrics["aurc"],
-                            "acc_cov_auc": sel_metrics["acc_cov_auc"],
-                            "coverage_at_1pct_error": sel_metrics[
-                                "coverage_at_1pct_error"
-                            ],
-                            "coverage_at_2pct_error": sel_metrics[
-                                "coverage_at_2pct_error"
-                            ],
-                            "coverage_at_5pct_error": sel_metrics[
-                                "coverage_at_5pct_error"
-                            ],
-                            "n_ind_samples": sel_metrics["n_samples"],
-                            "n_ood_samples": None,
-                            "n_correct": None,
-                            "n_incorrect": None,
-                            "ensemble_accuracy": group_data["ensemble_accuracy"],
-                        }
-                    )
+                append_uncertainty_evaluation_rows(
+                    ind_dataset=ind_dataset,
+                    ood_dataset=ood_dataset,
+                    measure=measure_name,
+                    uncertainty_type=uncertainty_type,
+                    uncertainty_scores_ind=uncertainty_scores_ind,
+                    uncertainty_scores_ood=uncertainty_scores_ood,
+                    group_idx=group_idx,
+                    group_data=group_data,
+                    results=results,
+                    processed_same_dataset=processed_same_dataset,
+                )
 
             except Exception as e:
                 if args.verbose:
                     print(
-                        f"✗ Failed EntropicOT training for {composition_name} group {group_idx}: {e}"
+                        f"✗ Failed {uncertainty_type} training for {composition_name} group {group_idx}: {e}"
                     )
                 continue
 
         if args.verbose:
-            # print(f"✓ Processed composition {composition_name} for {ind_dataset.value}->{ood_dataset.value}")
             pass
 
     except Exception as e:

@@ -24,6 +24,11 @@ def get_args():
         help="Output CSV file path",
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--skip_pca_baseline",
+        action="store_true",
+        help="Skip PCA baselines for multidimensional compositions",
+    )
 
     # EntropicOT hyperparameters
     parser.add_argument(
