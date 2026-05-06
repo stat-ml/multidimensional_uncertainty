@@ -124,6 +124,11 @@ summary CSVs, and small selected tables under
 `notebooks/aggregation_contrast_insights.ipynb` to inspect where each
 aggregation tends to break.
 
+For a global winner-rate view of `Ours`, PCA, and additive aggregation, use
+`notebooks/aggregation_winner_barplots.ipynb`. It writes five barplots to
+`resources/paper_tables/aggregation_winner_barplots`: overall, OOD detection,
+misclassification detection, selective prediction, and LLM selective generation.
+
 ## Aggregators
 
 `mdu/unc/entropic_ot.py` contains `EntropicOTOrdering`. It fits an entropic OT
