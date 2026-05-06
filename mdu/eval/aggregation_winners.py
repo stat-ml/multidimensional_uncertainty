@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -117,10 +118,19 @@ def build_llm_winner_records_from_dir(
 def build_llm_winner_records_from_csvs(paths: Sequence[str | Path]) -> pd.DataFrame:
     """Compare Ours/PCA/Additive for every provided LLM result CSV."""
     frames = {
-        _model_name_from_path(Path(path)): pd.read_csv(path)
+        _model_name_from_path(Path(path)): load_llm_results_csv(path)
         for path in paths
     }
     return build_llm_winner_records(frames)
+
+
+def load_llm_results_csv(path: str | Path) -> pd.DataFrame:
+    """Load LLM result CSVs, keeping metric score columns and dropping ranks."""
+    path = Path(path)
+    multi_header = pd.read_csv(path, header=[0, 1])
+    if _looks_like_score_rank_header(multi_header):
+        return normalize_llm_results_dataframe(multi_header)
+    return normalize_llm_results_dataframe(pd.read_csv(path))
 
 
 def build_llm_winner_records(
@@ -129,6 +139,7 @@ def build_llm_winner_records(
     """Compare matching LLM aggregation triplets in wide result tables."""
     records = []
     for model_name, df in dfs_by_model.items():
+        df = normalize_llm_results_dataframe(df)
         if "Method" not in df.columns:
             continue
 
@@ -169,6 +180,7 @@ def build_llm_winner_records(
 
 def llm_score_columns(df: pd.DataFrame) -> list[str]:
     """Return real score columns from an LLM wide table, excluding ranks."""
+    df = normalize_llm_results_dataframe(df)
     score_cols = []
     for col in df.columns:
         col_name = str(col)
@@ -187,6 +199,15 @@ def llm_score_columns(df: pd.DataFrame) -> list[str]:
     return score_cols
 
 
+def normalize_llm_results_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize simple or score/rank LLM tables to Method + metric score columns."""
+    if isinstance(df.columns, pd.MultiIndex):
+        return _normalize_multiindex_llm_results(df)
+    if _looks_like_default_score_rank_read(df):
+        return _normalize_default_score_rank_read(df)
+    return df.copy()
+
+
 def llm_matching_compositions(methods: Sequence[str]) -> list[str]:
     """Return unprefixed LLM methods that have PCA_ and Additive_ partners."""
     method_set = set(map(str, methods))
@@ -197,6 +218,65 @@ def llm_matching_compositions(methods: Sequence[str]) -> list[str]:
         if f"PCA_{method}" in method_set and f"Additive_{method}" in method_set:
             compositions.append(method)
     return compositions
+
+
+def _looks_like_score_rank_header(df: pd.DataFrame) -> bool:
+    if not isinstance(df.columns, pd.MultiIndex):
+        return False
+    second_level = {str(value).lower() for value in df.columns.get_level_values(1)}
+    first_level = {str(value) for value in df.columns.get_level_values(0)}
+    return "score" in second_level and "rank" in second_level and "Method" in first_level
+
+
+def _normalize_multiindex_llm_results(df: pd.DataFrame) -> pd.DataFrame:
+    method_col = None
+    for col in df.columns:
+        if str(col[0]) == "Method":
+            method_col = col
+            break
+    if method_col is None:
+        return pd.DataFrame()
+
+    normalized = pd.DataFrame({"Method": df[method_col]})
+    for col in df.columns:
+        dataset = str(col[0])
+        subcolumn = str(col[1]).lower()
+        if dataset == "Method" or dataset.startswith("Unnamed:"):
+            continue
+        if dataset == "mean":
+            continue
+        if subcolumn != "score":
+            continue
+        normalized[dataset] = df[col]
+    return normalized
+
+
+def _looks_like_default_score_rank_read(df: pd.DataFrame) -> bool:
+    if df.empty or "Method" not in df.columns:
+        return False
+    first_row = df.iloc[0].astype(str).str.lower()
+    return first_row.isin(["score", "rank"]).any()
+
+
+def _normalize_default_score_rank_read(df: pd.DataFrame) -> pd.DataFrame:
+    data = df.iloc[1:].reset_index(drop=True)
+    normalized = pd.DataFrame({"Method": data["Method"]})
+
+    for col in df.columns:
+        if col == "Method" or str(col).startswith("Unnamed:"):
+            continue
+        dataset = _strip_duplicate_suffix(str(col))
+        if dataset == "mean":
+            continue
+        subcolumn = str(df.iloc[0][col]).lower()
+        if subcolumn != "score":
+            continue
+        normalized[dataset] = data[col]
+    return normalized
+
+
+def _strip_duplicate_suffix(column: str) -> str:
+    return re.sub(r"\.\d+$", "", column)
 
 
 def summarize_winners(records: pd.DataFrame) -> pd.DataFrame:

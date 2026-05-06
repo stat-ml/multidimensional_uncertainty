@@ -8,6 +8,7 @@ import pandas as pd
 from mdu.eval.aggregation_winners import (
     build_image_winner_records,
     build_llm_winner_records_from_dir,
+    load_llm_results_csv,
     summarize_winners,
 )
 
@@ -87,6 +88,38 @@ class AggregationWinnersTest(unittest.TestCase):
         credits = dict(zip(mmlu["aggregation"], mmlu["winner_credit"]))
         self.assertEqual(credits["Ours"], 0.5)
         self.assertEqual(credits["PCA"], 0.5)
+        self.assertEqual(credits["Additive"], 0.0)
+
+    def test_llm_score_rank_csv_uses_score_columns_only(self):
+        csv_text = "\n".join(
+            [
+                ",Method,trivia,trivia,mmlu,mmlu,mean,mean",
+                ",,score,rank,score,rank,score,rank",
+                "0,IMBA_5_Beta_FeatureWise,0.5,3,0.7,1,0.6,1",
+                "1,PCA_IMBA_5_Beta_FeatureWise,0.6,1,0.7,1,0.65,1",
+                "2,Additive_IMBA_5_Beta_FeatureWise,0.4,2,0.1,3,0.25,3",
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "falcon7b_results.csv"
+            path.write_text(csv_text)
+
+            normalized = load_llm_results_csv(path)
+            records = build_llm_winner_records_from_dir(tmp)
+
+        self.assertEqual(normalized.columns.tolist(), ["Method", "trivia", "mmlu"])
+        self.assertEqual(len(records), 6)
+        self.assertEqual(
+            set(records["context"]),
+            {"falcon7b | trivia", "falcon7b | mmlu"},
+        )
+        self.assertFalse(records["context"].str.contains("rank").any())
+
+        trivia = records[records["context"].eq("falcon7b | trivia")]
+        credits = dict(zip(trivia["aggregation"], trivia["winner_credit"]))
+        self.assertEqual(credits["PCA"], 1.0)
+        self.assertEqual(credits["Ours"], 0.0)
         self.assertEqual(credits["Additive"], 0.0)
 
 
