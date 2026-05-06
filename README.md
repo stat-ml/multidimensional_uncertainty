@@ -93,10 +93,15 @@ This writes:
 - LaTeX tables under `resources/paper_tables/latex`;
 - per-composition tables with components plus EntropicOT, PCA, and additive
   baselines under `resources/paper_tables/composition_tables`;
-- `average_ranks.csv`, `measure_summary.csv`, and `pareto_summary.csv`.
+- `average_ranks.csv`, `measure_summary.csv`, `pareto_summary.csv`, and
+  `article_pareto_table.csv`.
 
 `pareto_summary.csv` counts EntropicOT, PCA, and additive aggregations on the
 same component-wise Pareto-front criterion.
+`article_pareto_table.csv` and `latex/article_pareto_table.tex` rebuild the
+right-hand Table 2-style Pareto-front table for
+`COMPOSITE EAT LOGSCORE OUTER OUTER + M`, comparing Ours, PCA, Additive, and
+the individual components in the same Pareto-front calculation.
 
 There is also a thin notebook wrapper at `notebooks/paper_tables.ipynb` if you
 want to inspect the generated tables interactively.

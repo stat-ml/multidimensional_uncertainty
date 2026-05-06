@@ -8,6 +8,7 @@ import pandas as pd
 from mdu.eval.paper_tables import (
     DEFAULT_AVERAGE_ROW,
     build_and_write_paper_tables,
+    build_article_pareto_table,
     build_paper_tables,
 )
 
@@ -126,10 +127,14 @@ class PaperTablesTest(unittest.TestCase):
         self.assertIn("average_rank", bundle.average_ranks.columns)
         self.assertFalse(bundle.measure_summary.empty)
         self.assertFalse(bundle.pareto_summary.empty)
+        self.assertFalse(bundle.article_pareto_table.empty)
         self.assertEqual(
             set(bundle.pareto_summary["aggregation"]),
             {"EntropicOT", "PCA", "Additive"},
         )
+        self.assertIn("Ours", set(bundle.article_pareto_table["method"]))
+        self.assertIn("PCA", set(bundle.article_pareto_table["method"]))
+        self.assertIn("Additive", set(bundle.article_pareto_table["method"]))
 
         composition_table = bundle.composition_mean_tables[COMPOSITION][
             "ood_detection"
@@ -157,6 +162,10 @@ class PaperTablesTest(unittest.TestCase):
             self.assertTrue((output_dir / "all_tasks_mean.csv").exists())
             self.assertTrue((output_dir / "average_ranks.csv").exists())
             self.assertTrue((output_dir / "pareto_summary.csv").exists())
+            self.assertTrue((output_dir / "article_pareto_table.csv").exists())
+            self.assertTrue(
+                (output_dir / "latex" / "article_pareto_table.tex").exists()
+            )
             self.assertTrue(
                 (output_dir / "problem_tables" / "ood_detection_mean.csv").exists()
             )
@@ -168,6 +177,35 @@ class PaperTablesTest(unittest.TestCase):
                     / "composite_bayes_all_outer_ood_detection_mean.csv"
                 ).exists()
             )
+
+    def test_article_pareto_table_compares_all_methods_together(self):
+        index = pd.MultiIndex.from_tuples(
+            [
+                ("cifar10", "svhn [ood]"),
+                ("cifar10", "tiny_imagenet [ood]"),
+                ("cifar100", "cifar10 [ood]"),
+            ],
+            names=["ind_dataset", "eval"],
+        )
+        transformed = pd.DataFrame(
+            {
+                "R_b 1 (Logscore)": [0.4, 0.4, 0.4],
+                "R_b 1 (Brier)": [0.5, 0.5, 0.5],
+                "R_b 1 (Spherical)": [0.6, 0.6, 0.6],
+                "R_b 1 (Zero-one)": [0.7, 0.7, 0.7],
+                COMPOSITION.lower(): [0.8, 0.8, 0.8],
+                f"pca {COMPOSITION}".lower(): [0.9, 0.9, 0.9],
+                f"additive {COMPOSITION}".lower(): [0.3, 0.3, 0.3],
+            },
+            index=index,
+        )
+
+        table = build_article_pareto_table(transformed, COMPOSITION)
+
+        scores = dict(zip(table["method"], table["pareto_percentage"]))
+        self.assertEqual(scores["PCA"], 100.0)
+        self.assertEqual(scores["Ours"], 0.0)
+        self.assertEqual(scores["Additive"], 0.0)
 
 
 if __name__ == "__main__":

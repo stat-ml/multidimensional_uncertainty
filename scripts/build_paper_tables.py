@@ -33,6 +33,12 @@ def parse_args():
         help="Metric column to use for selective prediction tables",
     )
     parser.add_argument(
+        "--article_pareto_composition",
+        type=str,
+        default="COMPOSITE EAT LOGSCORE OUTER OUTER + M",
+        help="Composition used for the Table 2-style Pareto-front table",
+    )
+    parser.add_argument(
         "--no_latex",
         action="store_true",
         help="Write CSV files only",
@@ -63,6 +69,7 @@ def main():
         input_csv=args.input_csv,
         output_dir=args.output_dir,
         selective_metric=args.selective_metric,
+        article_pareto_composition=args.article_pareto_composition,
         include_composition_tables=not args.no_composition_tables,
         write_latex=not args.no_latex,
         mean_decimals=args.mean_decimals,
@@ -74,6 +81,7 @@ def main():
     for problem_type, table in bundle.problem_mean_tables.items():
         print(f"{problem_type}: {table.shape}")
     print(f"Average-rank rows: {len(bundle.average_ranks)}")
+    print(f"Article Pareto rows: {len(bundle.article_pareto_table)}")
     print(f"Composition table groups: {len(bundle.composition_mean_tables)}")
 
 
