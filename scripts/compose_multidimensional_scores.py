@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -7,15 +9,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # save as scripts/combo_from_npz.py
-from __future__ import annotations
 import itertools
-from pathlib import Path
 import argparse
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 from mdu.unc.entropic_ot import EntropicOTOrdering
-import torch
+from mdu.unc.constants import OTTarget, SamplingMethod, ScalingType
 from tqdm.auto import tqdm
 
 
@@ -33,7 +33,7 @@ def find_measures(results_root: str | Path, ind: str, ood: str) -> dict[str, Pat
     return out
 
 
-def run(n: int, ind: str, ood: str, results_root: str | Path):
+def run(n: int, ind: str, ood: str, results_root: str | Path, verbose: bool = False):
     out_csv = f".resources/results/{ind}_{ood}_{n}_combo_results.csv"
 
     measures = find_measures(results_root, ind, ood)
@@ -82,11 +82,15 @@ def run(n: int, ind: str, ood: str, results_root: str | Path):
                 uncertainty_matrix_ood.append(ood_scores)
 
             model = EntropicOTOrdering(
-                target="exp",
-                standardize=True,
-                fit_mse_params=False,
+                target=OTTarget.EXP,
+                sampling_method=SamplingMethod.GRID,
+                scaling_type=ScalingType.FEATURE_WISE,
+                grid_size=5,
+                target_params={},
                 eps=0.25,
+                n_targets_multiplier=1,
                 max_iters=150,
+                random_state=42,
                 tol=1e-6,
             )
 
@@ -94,21 +98,11 @@ def run(n: int, ind: str, ood: str, results_root: str | Path):
             uncertainty_matrix_calib = np.column_stack(uncertainty_matrix_calib)
             uncertainty_matrix_ood = np.column_stack(uncertainty_matrix_ood)
 
-            train_loader = torch.utils.data.DataLoader(
-                torch.tensor(
-                    uncertainty_matrix_calib,
-                    dtype=torch.float32,
-                    device="cpu",
-                ),
-                batch_size=128,
-                shuffle=True,
-            )
-
             try:
-                model.fit(train_loader, {})
+                model.fit(uncertainty_matrix_calib)
 
-                uncertainty_scores_ind, _ = model.predict(uncertainty_matrix_ind)
-                uncertainty_scores_ood, _ = model.predict(uncertainty_matrix_ood)
+                uncertainty_scores_ind = model.predict(uncertainty_matrix_ind)
+                uncertainty_scores_ood = model.predict(uncertainty_matrix_ood)
 
                 all_scores = np.concatenate(
                     [uncertainty_scores_ind, uncertainty_scores_ood]
@@ -130,8 +124,13 @@ def run(n: int, ind: str, ood: str, results_root: str | Path):
                 df.to_csv(out_csv, mode="a", index=False, header=write_header)
                 print(f"Interrupted! Saved {len(rows)} rows to {out_csv}")
                 exit()
-            except:
-                break
+            except Exception as e:
+                if verbose:
+                    print(
+                        f"Failed combo={combo_names} group={group_idx} "
+                        f"for {ind}->{ood}: {e}"
+                    )
+                continue
             row["multidimensional_score"] = auc
 
             rows.append(row)
@@ -151,5 +150,12 @@ if __name__ == "__main__":
     p.add_argument("--ind_dataset", type=str, required=True)
     p.add_argument("--ood_dataset", type=str, required=True)
     p.add_argument("--results_root", type=str, default=".resources/results")
+    p.add_argument("--verbose", action="store_true")
     args = p.parse_args()
-    df = run(args.n, args.ind_dataset, args.ood_dataset, args.results_root)
+    df = run(
+        args.n,
+        args.ind_dataset,
+        args.ood_dataset,
+        args.results_root,
+        verbose=args.verbose,
+    )

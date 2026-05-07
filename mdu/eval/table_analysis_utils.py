@@ -466,17 +466,18 @@ def analyze_composite_pareto_performance(
     composite_names: Dict[str, object],
     do_for_each_measure: bool = False,
     different_only: bool = False,
+    include_baseline_aggregations: bool = True,
 ) -> Dict[str, Dict[str, object]]:
     """
-    For each composite, count how often it lies on the Pareto front
+    For each composite aggregation, count how often it lies on the Pareto front
     of its components across all pairs of problems. Returns stats dict.
+
+    By default this evaluates the EntropicOT composition and, when present in
+    `transformed_df`, the matching additive aggregation baseline.
 
     When do_for_each_measure=True, also calculates Pareto stats for each individual component.
     """
-    import itertools
     from typing import Union
-
-    import pandas as pd  # local import preserved
 
     composite_pareto_results: Dict[
         str, Dict[str, Union[float, Dict[str, Dict[str, float]]]]
@@ -488,147 +489,168 @@ def analyze_composite_pareto_performance(
                 transformed_df, composite_name
             )
 
-            composite_cols = [
-                c for c in composite_df.columns if c.startswith("composite")
-            ]
-            if not composite_cols:
-                print(f"No composite column found for {composite_name}")
+            aggregation_candidates = _pareto_aggregation_candidates(
+                transformed_df,
+                composite_name,
+                include_baseline_aggregations=include_baseline_aggregations,
+            )
+            if not aggregation_candidates:
+                print(f"No aggregation columns found for {composite_name}")
                 continue
 
-            composite_col = composite_cols[0]
+            aggregation_cols = {col for _, col in aggregation_candidates}
             component_cols = [
-                c for c in composite_df.columns if not c.startswith("composite")
+                c for c in composite_df.columns if c not in aggregation_cols
             ]
             if len(component_cols) < 2:
                 print(f"Not enough components for {composite_name} (need at least 2)")
                 continue
 
-            problems = list(composite_df.index)
+            for result_name, aggregation_col in aggregation_candidates:
+                if aggregation_col not in composite_df.columns:
+                    composite_df[aggregation_col] = transformed_df[aggregation_col]
 
-            # Initialize results for this composite
-            result_dict = {}
-
-            # Calculate composite Pareto stats
-            composite_pareto_count = 0
-            total_pairs = 0
-            composite_depths = []  # Track all depth values for composite
-
-            # If analyzing individual measures, initialize counters for each component
-            if do_for_each_measure:
-                component_pareto_counts = {col: 0 for col in component_cols}
-                component_total_pairs = {col: 0 for col in component_cols}
-                component_depths = {
-                    col: [] for col in component_cols
-                }  # Track depths for each component
-
-            for problem1, problem2 in itertools.combinations(problems, 2):
-                if different_only and (problem1[1].split()[1] == problem2[1].split()[1]):
-                    continue
-                row1 = composite_df.loc[problem1]
-                row2 = composite_df.loc[problem2]
-
-                c1, c2 = row1[composite_col], row2[composite_col]
-                if pd.isna(c1) or pd.isna(c2):
-                    continue
-
-                points: List[Tuple[float, float]] = []
-                valid_component_indices = []
-
-                # components
-                for i, col in enumerate(component_cols):
-                    v1, v2 = row1[col], row2[col]
-                    if pd.notna(v1) and pd.notna(v2):
-                        points.append((v1, v2))
-                        valid_component_indices.append(i)
-
-                # composite
-                points.append((c1, c2))
-
-                # Need >= 3 points (2 comps + 1 composite) to be meaningful
-                if len(points) < 3:
-                    continue
-
-                pareto_indices = pareto_front(points)
-                depths = pareto_depth(points)
-
-                # Check if composite is on Pareto front (it's the last point added)
-                composite_idx = len(points) - 1
-                composite_depths.append(depths[composite_idx])
-                if composite_idx in pareto_indices:
-                    composite_pareto_count += 1
-                total_pairs += 1
-
-                # If analyzing individual measures, check each component
-                if do_for_each_measure:
-                    for point_idx in range(
-                        len(points) - 1
-                    ):  # Exclude composite (last point)
-                        component_idx = valid_component_indices[point_idx]
-                        col = component_cols[component_idx]
-
-                        component_depths[col].append(depths[point_idx])
-                        if point_idx in pareto_indices:
-                            component_pareto_counts[col] += 1
-                        component_total_pairs[col] += 1
-
-            # Store composite results
-            if total_pairs > 0:
-                import numpy as np
-
-                composite_pct = (composite_pareto_count / total_pairs) * 100
-                composite_avg_depth = (
-                    np.mean(composite_depths) if composite_depths else 0.0
+                result_dict = _pareto_stats_for_aggregation(
+                    composite_df=composite_df,
+                    component_cols=component_cols,
+                    aggregation_col=aggregation_col,
+                    do_for_each_measure=do_for_each_measure,
+                    different_only=different_only,
                 )
-                composite_median_depth = (
-                    np.median(composite_depths) if composite_depths else 0.0
-                )
-
-                result_dict.update(
-                    {
-                        "pareto_count": composite_pareto_count,
-                        "total_problems": total_pairs,
-                        "pareto_percentage": composite_pct,
-                        "average_pareto_depth": composite_avg_depth,
-                        "median_pareto_depth": composite_median_depth,
-                    }
-                )
-
-                # Store individual component results if requested
-                if do_for_each_measure:
-                    individual_measures = {}
-                    for col in component_cols:
-                        if component_total_pairs[col] > 0:
-                            component_pct = (
-                                component_pareto_counts[col]
-                                / component_total_pairs[col]
-                            ) * 100
-                            component_avg_depth = (
-                                np.mean(component_depths[col])
-                                if component_depths[col]
-                                else 0.0
-                            )
-                            component_median_depth = (
-                                np.median(component_depths[col])
-                                if component_depths[col]
-                                else 0.0
-                            )
-
-                            individual_measures[col] = {
-                                "pareto_count": component_pareto_counts[col],
-                                "total_problems": component_total_pairs[col],
-                                "pareto_percentage": component_pct,
-                                "average_pareto_depth": component_avg_depth,
-                                "median_pareto_depth": component_median_depth,
-                            }
-
-                    result_dict["individual_measures"] = individual_measures
-
-                composite_pareto_results[composite_name] = result_dict
+                if result_dict is not None:
+                    composite_pareto_results[result_name] = result_dict
 
         except Exception as e:
             print(f"Error analyzing {composite_name}: {e}")
 
     return composite_pareto_results
+
+
+def _pareto_aggregation_candidates(
+    transformed_df: pd.DataFrame,
+    composite_name: str,
+    *,
+    include_baseline_aggregations: bool,
+) -> List[Tuple[str, str]]:
+    candidates = [(composite_name, composite_name.lower())]
+    if include_baseline_aggregations:
+        candidates.extend(
+            [
+                (
+                    f"Additive {composite_name}",
+                    f"additive {composite_name}".lower(),
+                ),
+            ]
+        )
+
+    return [
+        (result_name, column)
+        for result_name, column in candidates
+        if column in transformed_df.columns
+    ]
+
+
+def _pareto_stats_for_aggregation(
+    *,
+    composite_df: pd.DataFrame,
+    component_cols: Sequence[str],
+    aggregation_col: str,
+    do_for_each_measure: bool,
+    different_only: bool,
+) -> Dict[str, object] | None:
+    import itertools
+    import numpy as np
+
+    problems = list(composite_df.index)
+
+    aggregation_pareto_count = 0
+    total_pairs = 0
+    aggregation_depths = []
+
+    if do_for_each_measure:
+        component_pareto_counts = {col: 0 for col in component_cols}
+        component_total_pairs = {col: 0 for col in component_cols}
+        component_depths = {col: [] for col in component_cols}
+
+    for problem1, problem2 in itertools.combinations(problems, 2):
+        if different_only and (problem1[1].split()[1] == problem2[1].split()[1]):
+            continue
+
+        row1 = composite_df.loc[problem1]
+        row2 = composite_df.loc[problem2]
+
+        a1, a2 = row1[aggregation_col], row2[aggregation_col]
+        if pd.isna(a1) or pd.isna(a2):
+            continue
+
+        points: List[Tuple[float, float]] = []
+        valid_component_cols = []
+
+        for col in component_cols:
+            v1, v2 = row1[col], row2[col]
+            if pd.notna(v1) and pd.notna(v2):
+                points.append((v1, v2))
+                valid_component_cols.append(col)
+
+        points.append((a1, a2))
+
+        # Need >= 3 points (2 components + 1 aggregation) to be meaningful.
+        if len(points) < 3:
+            continue
+
+        pareto_indices = pareto_front(points)
+        depths = pareto_depth(points)
+
+        aggregation_idx = len(points) - 1
+        aggregation_depths.append(depths[aggregation_idx])
+        if aggregation_idx in pareto_indices:
+            aggregation_pareto_count += 1
+        total_pairs += 1
+
+        if do_for_each_measure:
+            for point_idx, col in enumerate(valid_component_cols):
+                component_depths[col].append(depths[point_idx])
+                if point_idx in pareto_indices:
+                    component_pareto_counts[col] += 1
+                component_total_pairs[col] += 1
+
+    if total_pairs == 0:
+        return None
+
+    result_dict: Dict[str, object] = {
+        "pareto_count": aggregation_pareto_count,
+        "total_problems": total_pairs,
+        "pareto_percentage": (aggregation_pareto_count / total_pairs) * 100,
+        "average_pareto_depth": np.mean(aggregation_depths)
+        if aggregation_depths
+        else 0.0,
+        "median_pareto_depth": np.median(aggregation_depths)
+        if aggregation_depths
+        else 0.0,
+    }
+
+    if do_for_each_measure:
+        individual_measures = {}
+        for col in component_cols:
+            if component_total_pairs[col] > 0:
+                individual_measures[col] = {
+                    "pareto_count": component_pareto_counts[col],
+                    "total_problems": component_total_pairs[col],
+                    "pareto_percentage": (
+                        component_pareto_counts[col] / component_total_pairs[col]
+                    )
+                    * 100,
+                    "average_pareto_depth": np.mean(component_depths[col])
+                    if component_depths[col]
+                    else 0.0,
+                    "median_pareto_depth": np.median(component_depths[col])
+                    if component_depths[col]
+                    else 0.0,
+                }
+
+        result_dict["individual_measures"] = individual_measures
+
+    return result_dict
 
 
 # ---- Ranking --------------------------------------------------------------------------

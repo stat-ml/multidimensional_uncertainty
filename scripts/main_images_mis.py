@@ -14,6 +14,7 @@ from mdu.data.constants import DatasetName
 from sklearn.metrics import roc_auc_score
 from mdu.data.data_utils import split_dataset_indices
 import pandas as pd
+from mdu.unc.additive_baseline import AdditiveUncertaintyOrdering
 from mdu.unc.constants import OTTarget, SamplingMethod, ScalingType
 from mdu.unc.entropic_ot import EntropicOTOrdering
 from mdu.unc.multidimensional_uncertainty import (
@@ -92,13 +93,14 @@ def main(
             eps=eps,
             n_targets_multiplier=n_targets_multiplier,
             max_iters=max_iters,
-            random_state=random_state,
+            random_state=seed,
             tol=tol,
         )
+        additive_uncertainty = AdditiveUncertaintyOrdering()
 
         uncertainty_scores_calib, fitted_uncertainty_estimators = (
             fit_and_apply_uncertainty_estimators(
-                uncertainty_configs=UNCERTAINTY_MEASURES,
+                uncertainty_configs=uncertainty_measures,
                 X_calib_logits=X_train_cond,
                 y_calib=y_train_cond,
                 X_test_logits=X_calib,
@@ -120,9 +122,13 @@ def main(
         multi_dim_uncertainty.fit(
             scores_cal=scores_calib,
         )
+        additive_uncertainty.fit(scores_calib)
 
         uncertainty_scores_list_ind.append(
             ("multidim_scores", multi_dim_uncertainty.predict(scores_ind))
+        )
+        uncertainty_scores_list_ind.append(
+            ("additive_scores", additive_uncertainty.predict(scores_ind))
         )
 
         # Compute ROC AUC between in-distribution (class 0) and OOD (class 1) using sklearn
