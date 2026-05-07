@@ -9,7 +9,7 @@ COMPOSITION = "COMPOSITE BAYES ALL OUTER"
 
 
 class ParetoAggregationBaselinesTest(unittest.TestCase):
-    def test_pareto_analysis_includes_pca_and_additive(self):
+    def test_pareto_analysis_includes_additive(self):
         transformed = _transformed_composition_table(include_baselines=True)
 
         results = analyze_composite_pareto_performance(
@@ -18,9 +18,7 @@ class ParetoAggregationBaselinesTest(unittest.TestCase):
         )
 
         self.assertIn(COMPOSITION, results)
-        self.assertIn(f"PCA {COMPOSITION}", results)
         self.assertIn(f"Additive {COMPOSITION}", results)
-        self.assertEqual(results[f"PCA {COMPOSITION}"]["total_problems"], 3)
         self.assertEqual(results[f"Additive {COMPOSITION}"]["total_problems"], 3)
 
     def test_pareto_baselines_can_be_disabled_for_old_behavior(self):
@@ -52,7 +50,6 @@ def _transformed_composition_table(include_baselines):
         COMPOSITION.lower(): [0.50, 0.50, 0.50],
     }
     if include_baselines:
-        data[f"pca {COMPOSITION}".lower()] = [0.60, 0.60, 0.60]
         data[f"additive {COMPOSITION}".lower()] = [0.30, 0.30, 0.30]
     return pd.DataFrame(data, index=index)
 

@@ -69,13 +69,10 @@ By default this evaluates:
 
 - every individual 1D measure;
 - every configured composition with EntropicOT (`uncertainty_type=EntropicOT`);
-- every configured composition with the PCA baseline (`uncertainty_type=PCA`);
 - every configured composition with the additive baseline
   (`uncertainty_type=Additive`).
 
-Use `--skip_pca_baseline` if you want only the old EntropicOT composition
-results without PCA. Use `--skip_additive_baseline` to disable the naive
-summation baseline.
+Use `--skip_additive_baseline` to disable the naive summation baseline.
 
 5. Build article tables from the full evaluation CSV:
 
@@ -91,17 +88,17 @@ This writes:
 - OOD, misclassification, and selective prediction tables under
   `resources/paper_tables/problem_tables`;
 - LaTeX tables under `resources/paper_tables/latex`;
-- per-composition tables with components plus EntropicOT, PCA, and additive
+- per-composition tables with components plus EntropicOT and additive
   baselines under `resources/paper_tables/composition_tables`;
 - `average_ranks.csv`, `measure_summary.csv`, `pareto_summary.csv`, and
   `article_pareto_table.csv`.
 
-`pareto_summary.csv` counts EntropicOT, PCA, and additive aggregations on the
-same component-wise Pareto-front criterion.
+`pareto_summary.csv` counts EntropicOT and additive aggregations on the same
+component-wise Pareto-front criterion.
 `article_pareto_table.csv` and `latex/article_pareto_table.tex` rebuild the
 right-hand Table 2-style Pareto-front table for
-`COMPOSITE EAT LOGSCORE OUTER OUTER + M`, comparing Ours, PCA, Additive, and
-the individual components in the same Pareto-front calculation.
+`COMPOSITE EAT LOGSCORE OUTER OUTER + M`, comparing Ours, Additive, and the
+individual components in the same Pareto-front calculation.
 
 There is also a thin notebook wrapper at `notebooks/paper_tables.ipynb` if you
 want to inspect the generated tables interactively.
@@ -113,18 +110,18 @@ uv run python scripts/find_aggregation_contrasts.py \
   --input_csv ./resources/refactored/results.csv \
   --output_dir ./resources/paper_tables/aggregation_contrasts \
   --min_gap 0.05 \
-  --min_broken 2
+  --min_broken 1
 ```
 
-This compares EntropicOT, PCA, and additive aggregation for each composition and
-task row. A row is selected when the winner beats at least `--min_broken` other
-aggregations by at least `--min_gap`. The script writes `contrast_cases.csv`,
-summary CSVs, and small selected tables under
+This compares EntropicOT and additive aggregation for each composition and task
+row. A row is selected when the winner beats at least `--min_broken` other
+aggregation methods by at least `--min_gap`. The script writes
+`contrast_cases.csv`, summary CSVs, and small selected tables under
 `resources/paper_tables/aggregation_contrasts`. Use
-`notebooks/aggregation_contrast_insights.ipynb` to inspect where each
+`notebooks/aggregation_contrast_insights.ipynb` to inspect where either
 aggregation tends to break.
 
-For a global winner-rate view of `Ours`, PCA, and additive aggregation, use
+For a global winner-rate view of `Ours` and additive aggregation, use
 `notebooks/aggregation_winner_barplots.ipynb`. It writes five barplots to
 `resources/paper_tables/aggregation_winner_barplots`: overall, OOD detection,
 misclassification detection, selective prediction, and LLM selective generation.
@@ -134,12 +131,6 @@ misclassification detection, selective prediction, and LLM selective generation.
 `mdu/unc/entropic_ot.py` contains `EntropicOTOrdering`. It fits an entropic OT
 map on calibration uncertainty vectors and returns the norm of the barycentric
 rank image as the final scalar score.
-
-`mdu/unc/pca_baseline.py` contains `PCAUncertaintyOrdering`. It standardizes the
-1D component scores with z-score scaling, fits PCA on calibration vectors, and
-uses the first component as a scalar baseline. The component sign is oriented so
-that larger values correspond to larger overall uncertainty when the component
-loadings have positive total direction.
 
 `mdu/unc/additive_baseline.py` contains `AdditiveUncertaintyOrdering`. It is the
 most naive baseline: no scaling, no learned weights, just the raw sum of all
@@ -161,7 +152,6 @@ computes the configured 1D uncertainty measures on a grid, and visualizes:
 
 - the individual 1D component scores;
 - VecUQ-OT (`multidim_scores`);
-- PCA (`pca_scores`);
 - additive summation (`additive_scores`).
 
 The plots are written to `resources/pics`.
@@ -177,9 +167,8 @@ uv run python -m unittest discover
 It checks:
 
 - additive baseline summation behavior and shape validation;
-- PCA baseline shape, ordering, sign orientation, and constant-input behavior;
 - 1D EntropicOT ordering behavior against rank/CDF-like expectations;
-- evaluator smoke tests on fake `.npz`-shaped inputs for EntropicOT, PCA, and
+- evaluator smoke tests on fake `.npz`-shaped inputs for EntropicOT and
   additive baselines.
 
 For a quick syntax check of the main scripts:
@@ -191,5 +180,7 @@ uv run python -m py_compile \
   scripts/compose_multidimensional_scores.py \
   scripts/build_paper_tables.py \
   scripts/find_aggregation_contrasts.py \
-  scripts/main_toy.py
+  scripts/main_toy.py \
+  scripts/main_images_ood.py \
+  scripts/main_images_mis.py
 ```

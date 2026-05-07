@@ -10,7 +10,6 @@ from mdu.eval.eval_utils import (
     get_results_path,
     process_additive_composition,
     process_multidimensional_composition,
-    process_pca_composition,
 )
 from mdu.unc.constants import UncertaintyType
 
@@ -75,7 +74,7 @@ def write_composition_files(results_root, ind_dataset, ood_dataset):
 
 
 class CompositionEvaluatorTest(unittest.TestCase):
-    def test_entropic_and_pca_rows_share_schema(self):
+    def test_entropic_and_additive_rows_share_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
             results_root = Path(tmp)
             write_composition_files(
@@ -85,7 +84,6 @@ class CompositionEvaluatorTest(unittest.TestCase):
             prediction_data = make_prediction_data()
 
             entropic_results = []
-            pca_results = []
             additive_results = []
             process_multidimensional_composition(
                 "TEST COMPOSITION",
@@ -94,16 +92,6 @@ class CompositionEvaluatorTest(unittest.TestCase):
                 DatasetName.CIFAR100,
                 prediction_data,
                 entropic_results,
-                args,
-                set(),
-            )
-            process_pca_composition(
-                "TEST COMPOSITION",
-                COMPOSITION_CONFIGS,
-                DatasetName.CIFAR10,
-                DatasetName.CIFAR100,
-                prediction_data,
-                pca_results,
                 args,
                 set(),
             )
@@ -119,16 +107,8 @@ class CompositionEvaluatorTest(unittest.TestCase):
             )
 
             self.assertEqual(len(entropic_results), 3)
-            self.assertEqual(len(pca_results), 3)
             self.assertEqual(len(additive_results), 3)
-            self.assertEqual(set(entropic_results[0]), set(pca_results[0]))
             self.assertEqual(set(entropic_results[0]), set(additive_results[0]))
-            self.assertTrue(
-                all(row["uncertainty_type"] == "PCA" for row in pca_results)
-            )
-            self.assertTrue(
-                all(row["measure"] == "PCA TEST COMPOSITION" for row in pca_results)
-            )
             self.assertTrue(
                 all(
                     row["uncertainty_type"] == "Additive"
@@ -155,7 +135,7 @@ class CompositionEvaluatorTest(unittest.TestCase):
             results = []
 
             for ood_dataset in [DatasetName.CIFAR100, DatasetName.SVHN]:
-                process_pca_composition(
+                process_additive_composition(
                     "TEST COMPOSITION",
                     COMPOSITION_CONFIGS,
                     DatasetName.CIFAR10,

@@ -34,7 +34,6 @@ from mdu.unc.multidimensional_uncertainty import (
     fit_and_apply_uncertainty_estimators,
     pretty_compute_all_uncertainties,
 )
-from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 from mdu.vis.toy_plots import plot_decision_boundaries, plot_uncertainty_measures
 
 UNCERTAINTY_MEASURES = MAHALANOBIS_AND_BAYES_RISK
@@ -149,7 +148,6 @@ entropic_uncertainty = EntropicOTOrdering(
     random_state=random_state,
     tol=tol,
 )
-pca_uncertainty = PCAUncertaintyOrdering()
 additive_uncertainty = AdditiveUncertaintyOrdering()
 
 
@@ -169,7 +167,6 @@ scores_calib = np.column_stack(
 entropic_uncertainty.fit(
     scores_cal=scores_calib,
 )
-pca_uncertainty.fit(scores_calib)
 additive_uncertainty.fit(scores_calib)
 
 grid_points = np.stack([xx.ravel(), yy.ravel()], axis=-1)
@@ -187,7 +184,6 @@ pretty_uncertainty_scores_test = pretty_compute_all_uncertainties(
 scores_test = np.column_stack([scores for _, scores in pretty_uncertainty_scores_test])
 
 entropic_uncertainty_scores = entropic_uncertainty.predict(scores_test)
-pca_uncertainty_scores = pca_uncertainty.predict(scores_test)
 additive_uncertainty_scores = additive_uncertainty.predict(scores_test)
 
 
@@ -195,7 +191,6 @@ uncertainty_measures_dict = {k: v for k, v in pretty_uncertainty_scores_test}
 uncertainty_measures_dict.update(
     {
         "multidim_scores": entropic_uncertainty_scores,
-        "pca_scores": pca_uncertainty_scores,
         "additive_scores": additive_uncertainty_scores,
     }
 )

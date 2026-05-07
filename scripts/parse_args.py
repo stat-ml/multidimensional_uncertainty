@@ -25,11 +25,6 @@ def get_args():
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument(
-        "--skip_pca_baseline",
-        action="store_true",
-        help="Skip PCA baselines for multidimensional compositions",
-    )
-    parser.add_argument(
         "--skip_additive_baseline",
         action="store_true",
         help="Skip additive baselines for multidimensional compositions",

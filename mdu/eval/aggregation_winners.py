@@ -14,10 +14,9 @@ from mdu.eval.aggregation_contrasts import (
 )
 from mdu.eval.table_analysis_utils import transform_by_tasks
 
-AGGREGATION_ORDER = ("Ours", "PCA", "Additive")
+AGGREGATION_ORDER = ("Ours", "Additive")
 _IMAGE_AGGREGATION_NAMES = {
     "Ours": "EntropicOT",
-    "PCA": "PCA",
     "Additive": "Additive",
 }
 _WINNER_COLUMNS = [
@@ -69,7 +68,7 @@ def build_image_winner_records(
     selective_metric: str = "acc_cov_auc",
     composition_names: Sequence[str] | None = None,
 ) -> pd.DataFrame:
-    """Compare Ours/PCA/Additive for every image composition and task row."""
+    """Compare Ours/Additive for every image composition and task row."""
     transformed = transform_by_tasks(df, selective_metric=selective_metric)
     if composition_names is None:
         composition_names = list(INTERESTING_COMPOSITIONS)
@@ -110,13 +109,13 @@ def build_llm_winner_records_from_dir(
     *,
     pattern: str = "*_results.csv",
 ) -> pd.DataFrame:
-    """Compare Ours/PCA/Additive for every LLM result CSV in a directory."""
+    """Compare Ours/Additive for every LLM result CSV in a directory."""
     paths = sorted(Path(results_dir).glob(pattern))
     return build_llm_winner_records_from_csvs(paths)
 
 
 def build_llm_winner_records_from_csvs(paths: Sequence[str | Path]) -> pd.DataFrame:
-    """Compare Ours/PCA/Additive for every provided LLM result CSV."""
+    """Compare Ours/Additive for every provided LLM result CSV."""
     frames = {
         _model_name_from_path(Path(path)): load_llm_results_csv(path)
         for path in paths
@@ -136,7 +135,7 @@ def load_llm_results_csv(path: str | Path) -> pd.DataFrame:
 def build_llm_winner_records(
     dfs_by_model: Mapping[str, pd.DataFrame],
 ) -> pd.DataFrame:
-    """Compare matching LLM aggregation triplets in wide result tables."""
+    """Compare matching LLM aggregation pairs in wide result tables."""
     records = []
     for model_name, df in dfs_by_model.items():
         df = normalize_llm_results_dataframe(df)
@@ -155,7 +154,6 @@ def build_llm_winner_records(
         for composition in llm_matching_compositions(scores.index):
             methods = {
                 "Ours": composition,
-                "PCA": f"PCA_{composition}",
                 "Additive": f"Additive_{composition}",
             }
             for score_col in score_cols:
@@ -209,13 +207,13 @@ def normalize_llm_results_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def llm_matching_compositions(methods: Sequence[str]) -> list[str]:
-    """Return unprefixed LLM methods that have PCA_ and Additive_ partners."""
+    """Return unprefixed LLM methods that have Additive_ partners."""
     method_set = set(map(str, methods))
     compositions = []
     for method in sorted(method_set):
         if method.startswith("PCA_") or method.startswith("Additive_"):
             continue
-        if f"PCA_{method}" in method_set and f"Additive_{method}" in method_set:
+        if f"Additive_{method}" in method_set:
             compositions.append(method)
     return compositions
 

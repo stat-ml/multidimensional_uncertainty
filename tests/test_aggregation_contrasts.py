@@ -18,7 +18,6 @@ MEASURES = [
     "Risk_SphericalScore_BayesRisk_outer",
     "Risk_ZeroOneScore_BayesRisk_outer",
     COMPOSITION,
-    f"PCA {COMPOSITION}",
     f"Additive {COMPOSITION}",
 ]
 
@@ -31,7 +30,6 @@ def _fake_full_evaluation_df():
         "Risk_SphericalScore_BayesRisk_outer": 0.76,
         "Risk_ZeroOneScore_BayesRisk_outer": 0.77,
         COMPOSITION: 0.93,
-        f"PCA {COMPOSITION}": 0.78,
         f"Additive {COMPOSITION}": 0.72,
     }
     for group_idx in range(2):
@@ -67,14 +65,13 @@ class AggregationContrastsTest(unittest.TestCase):
             _fake_full_evaluation_df(),
             composition_names=[COMPOSITION],
             min_gap=0.05,
-            min_broken=2,
+            min_broken=1,
         )
 
         self.assertEqual(len(report.cases), 1)
         case = report.cases.iloc[0]
         self.assertEqual(case["winner"], "EntropicOT")
         self.assertEqual(case["problem_type"], "ood_detection")
-        self.assertIn("PCA", case["broken_aggregations"])
         self.assertIn("Additive", case["broken_aggregations"])
         self.assertFalse(report.summary_by_winner.empty)
         self.assertFalse(report.failure_counts.empty)
@@ -94,7 +91,7 @@ class AggregationContrastsTest(unittest.TestCase):
                 output_dir,
                 composition_names=[COMPOSITION],
                 min_gap=0.05,
-                min_broken=2,
+                min_broken=1,
             )
 
             self.assertEqual(len(report.cases), 1)

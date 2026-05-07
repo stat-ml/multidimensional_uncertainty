@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Find table rows where one aggregation baseline works while the "
-            "other aggregation baselines trail clearly."
+            "other aggregation method trails clearly."
         )
     )
     parser.add_argument(
@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument(
         "--min_broken",
         type=int,
-        default=2,
+        default=1,
         help="How many non-winning aggregations must trail by at least min_gap",
     )
     parser.add_argument(

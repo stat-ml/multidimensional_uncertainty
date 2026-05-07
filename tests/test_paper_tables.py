@@ -20,7 +20,6 @@ MEASURES = [
     "Risk_SphericalScore_BayesRisk_outer",
     "Risk_ZeroOneScore_BayesRisk_outer",
     COMPOSITION,
-    f"PCA {COMPOSITION}",
     f"Additive {COMPOSITION}",
 ]
 
@@ -130,17 +129,15 @@ class PaperTablesTest(unittest.TestCase):
         self.assertFalse(bundle.article_pareto_table.empty)
         self.assertEqual(
             set(bundle.pareto_summary["aggregation"]),
-            {"EntropicOT", "PCA", "Additive"},
+            {"EntropicOT", "Additive"},
         )
         self.assertIn("Ours", set(bundle.article_pareto_table["method"]))
-        self.assertIn("PCA", set(bundle.article_pareto_table["method"]))
         self.assertIn("Additive", set(bundle.article_pareto_table["method"]))
 
         composition_table = bundle.composition_mean_tables[COMPOSITION][
             "ood_detection"
         ]
         self.assertIn(COMPOSITION.lower(), composition_table.columns)
-        self.assertIn(f"pca {COMPOSITION}".lower(), composition_table.columns)
         self.assertIn(f"additive {COMPOSITION}".lower(), composition_table.columns)
 
         formatted_value = bundle.problem_latex_tables["ood_detection"].iloc[0, 0]
@@ -194,7 +191,6 @@ class PaperTablesTest(unittest.TestCase):
                 "R_b 1 (Spherical)": [0.6, 0.6, 0.6],
                 "R_b 1 (Zero-one)": [0.7, 0.7, 0.7],
                 COMPOSITION.lower(): [0.8, 0.8, 0.8],
-                f"pca {COMPOSITION}".lower(): [0.9, 0.9, 0.9],
                 f"additive {COMPOSITION}".lower(): [0.3, 0.3, 0.3],
             },
             index=index,
@@ -203,8 +199,7 @@ class PaperTablesTest(unittest.TestCase):
         table = build_article_pareto_table(transformed, COMPOSITION)
 
         scores = dict(zip(table["method"], table["pareto_percentage"]))
-        self.assertEqual(scores["PCA"], 100.0)
-        self.assertEqual(scores["Ours"], 0.0)
+        self.assertEqual(scores["Ours"], 100.0)
         self.assertEqual(scores["Additive"], 0.0)
 
 

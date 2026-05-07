@@ -16,7 +16,7 @@ from mdu.eval.paper_tables import (
 )
 from mdu.eval.table_analysis_utils import transform_by_tasks
 
-AGGREGATIONS = ("EntropicOT", "PCA", "Additive")
+AGGREGATIONS = ("EntropicOT", "Additive")
 
 
 @dataclass
@@ -38,7 +38,7 @@ def build_aggregation_contrast_report(
     selective_metric: str = "acc_cov_auc",
     composition_names: Sequence[str] | None = None,
     min_gap: float = 0.05,
-    min_broken: int = 2,
+    min_broken: int = 1,
     min_winner_score: float | None = None,
     max_loser_score: float | None = None,
     top_n_per_table: int = 25,
@@ -93,7 +93,7 @@ def build_and_write_aggregation_contrast_report(
     selective_metric: str = "acc_cov_auc",
     composition_names: Sequence[str] | None = None,
     min_gap: float = 0.05,
-    min_broken: int = 2,
+    min_broken: int = 1,
     min_winner_score: float | None = None,
     max_loser_score: float | None = None,
     top_n_per_table: int = 25,
@@ -136,7 +136,7 @@ def find_aggregation_contrasts(
     std_table: pd.DataFrame | None = None,
     composition_names: Sequence[str],
     min_gap: float = 0.05,
-    min_broken: int = 2,
+    min_broken: int = 1,
     min_winner_score: float | None = None,
     max_loser_score: float | None = None,
 ) -> pd.DataFrame:
@@ -231,7 +231,6 @@ def aggregation_columns_for(
     """Map aggregation labels to transformed-table columns for one composition."""
     candidate_columns = {
         "EntropicOT": composition_name.lower(),
-        "PCA": f"pca {composition_name}".lower(),
         "Additive": f"additive {composition_name}".lower(),
     }
     return {

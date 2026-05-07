@@ -31,17 +31,16 @@ class AggregationWinnersTest(unittest.TestCase):
                 "selective_prediction",
             },
         )
-        self.assertEqual(set(records["aggregation"]), {"Ours", "PCA", "Additive"})
+        self.assertEqual(set(records["aggregation"]), {"Ours", "Additive"})
 
         comparison_credit = records.groupby(
             ["source", "problem_type", "composition", "context"]
         )["winner_credit"].sum()
         self.assertTrue(np.allclose(comparison_credit.to_numpy(), 1.0))
-        self.assertTrue((records.groupby("context").size() == 3).all())
+        self.assertTrue((records.groupby("context").size() == 2).all())
 
         selective = records[
             records["problem_type"].eq("selective_prediction")
-            & records["aggregation"].isin(["Ours", "PCA"])
         ]
         self.assertTrue(np.allclose(selective["winner_credit"].to_numpy(), 0.5))
         self.assertTrue(np.allclose(selective["rank"].to_numpy(), 1.5))
@@ -49,10 +48,9 @@ class AggregationWinnersTest(unittest.TestCase):
         summary = summarize_winners(records).set_index("aggregation")
         self.assertEqual(summary.loc["Ours", "n_comparisons"], 3)
         self.assertAlmostEqual(summary.loc["Ours", "win_rate"], 0.5)
-        self.assertAlmostEqual(summary.loc["PCA", "win_rate"], 0.5)
-        self.assertAlmostEqual(summary.loc["Additive", "win_rate"], 0.0)
+        self.assertAlmostEqual(summary.loc["Additive", "win_rate"], 0.5)
 
-    def test_llm_records_match_triplets_and_ignore_rank_columns(self):
+    def test_llm_records_match_pairs_and_ignore_rank_and_pca_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "llama8b_results.csv"
             pd.DataFrame(
@@ -74,7 +72,7 @@ class AggregationWinnersTest(unittest.TestCase):
 
             records = build_llm_winner_records_from_dir(tmp)
 
-        self.assertEqual(len(records), 6)
+        self.assertEqual(len(records), 4)
         self.assertEqual(set(records["source"]), {"llm"})
         self.assertEqual(set(records["problem_type"]), {"selective_generation"})
         self.assertEqual(
@@ -83,11 +81,11 @@ class AggregationWinnersTest(unittest.TestCase):
         )
         self.assertFalse(records["context"].str.contains("rank").any())
         self.assertFalse(records["composition"].str.contains("Incomplete").any())
+        self.assertNotIn("PCA", set(records["aggregation"]))
 
         mmlu = records[records["context"].eq("llama8b | mmlu")]
         credits = dict(zip(mmlu["aggregation"], mmlu["winner_credit"]))
-        self.assertEqual(credits["Ours"], 0.5)
-        self.assertEqual(credits["PCA"], 0.5)
+        self.assertEqual(credits["Ours"], 1.0)
         self.assertEqual(credits["Additive"], 0.0)
 
     def test_llm_score_rank_csv_uses_score_columns_only(self):
@@ -109,7 +107,7 @@ class AggregationWinnersTest(unittest.TestCase):
             records = build_llm_winner_records_from_dir(tmp)
 
         self.assertEqual(normalized.columns.tolist(), ["Method", "trivia", "mmlu"])
-        self.assertEqual(len(records), 6)
+        self.assertEqual(len(records), 4)
         self.assertEqual(
             set(records["context"]),
             {"falcon7b | trivia", "falcon7b | mmlu"},
@@ -118,9 +116,9 @@ class AggregationWinnersTest(unittest.TestCase):
 
         trivia = records[records["context"].eq("falcon7b | trivia")]
         credits = dict(zip(trivia["aggregation"], trivia["winner_credit"]))
-        self.assertEqual(credits["PCA"], 1.0)
-        self.assertEqual(credits["Ours"], 0.0)
+        self.assertEqual(credits["Ours"], 1.0)
         self.assertEqual(credits["Additive"], 0.0)
+        self.assertNotIn("PCA", set(records["aggregation"]))
 
 
 def _fake_image_results():
@@ -131,15 +129,10 @@ def _fake_image_results():
             "misclassification_detection": 0.70,
             "selective_prediction": 0.80,
         },
-        f"PCA {COMPOSITION}": {
-            "ood_detection": 0.80,
-            "misclassification_detection": 0.90,
-            "selective_prediction": 0.80,
-        },
         f"Additive {COMPOSITION}": {
             "ood_detection": 0.70,
-            "misclassification_detection": 0.60,
-            "selective_prediction": 0.40,
+            "misclassification_detection": 0.90,
+            "selective_prediction": 0.80,
         },
     }
     for measure, by_problem in scores.items():

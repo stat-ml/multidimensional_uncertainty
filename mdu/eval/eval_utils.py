@@ -15,7 +15,6 @@ from sklearn.metrics import (
 from mdu.data.data_utils import split_dataset_indices
 from mdu.unc.entropic_ot import EntropicOTOrdering
 from mdu.unc.additive_baseline import AdditiveUncertaintyOrdering
-from mdu.unc.pca_baseline import PCAUncertaintyOrdering
 from mdu.unc.constants import ScalingType, OTTarget, SamplingMethod
 
 
@@ -769,32 +768,6 @@ def process_multidimensional_composition(
         ),
         measure_name=composition_name,
         uncertainty_type="EntropicOT",
-    )
-
-
-def process_pca_composition(
-    composition_name,
-    configs,
-    ind_dataset,
-    ood_dataset,
-    prediction_data,
-    results,
-    args,
-    processed_same_dataset,
-):
-    """Process one multidimensional composition using PCA aggregation."""
-    _process_composition_with_ordering(
-        composition_name=composition_name,
-        configs=configs,
-        ind_dataset=ind_dataset,
-        ood_dataset=ood_dataset,
-        prediction_data=prediction_data,
-        results=results,
-        args=args,
-        processed_same_dataset=processed_same_dataset,
-        model_factory=PCAUncertaintyOrdering,
-        measure_name=f"PCA {composition_name}",
-        uncertainty_type="PCA",
     )
 
 

@@ -192,8 +192,6 @@ def plot_uncertainty_measures(xx, yy, uncertainty_measures_dict, X_test=None):
             ax.set_title("Additive")
         elif measure_name == "multidim_scores":
             ax.set_title("VecUQ-OT")
-        elif measure_name == "pca_scores":
-            ax.set_title("PCA")
         else:
             ax.set_title(measure_name)
         ax.set_xlabel("$x_1$")

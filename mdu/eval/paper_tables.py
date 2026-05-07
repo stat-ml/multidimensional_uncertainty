@@ -289,14 +289,13 @@ def select_composition_columns(
     transformed_table: pd.DataFrame,
     composition_name: str,
 ) -> pd.DataFrame:
-    """Select component, EntropicOT, PCA, and additive columns for a composition."""
+    """Select component, EntropicOT, and additive columns for a composition."""
     try:
         selected = select_composite_and_components(transformed_table, composition_name)
     except Exception:
         return pd.DataFrame(index=transformed_table.index)
 
     baseline_columns = [
-        f"pca {composition_name}".lower(),
         f"additive {composition_name}".lower(),
     ]
     for column in baseline_columns:
@@ -310,7 +309,7 @@ def build_pareto_summary(
     transformed_table: pd.DataFrame,
     composition_names: Sequence[str],
 ) -> pd.DataFrame:
-    """Build article Pareto-front summary for EntropicOT, PCA, and additive."""
+    """Build article Pareto-front summary for EntropicOT and additive."""
     selected_compositions = {
         name: INTERESTING_COMPOSITIONS[name]
         for name in composition_names
@@ -381,7 +380,7 @@ def build_article_pareto_table(
     Build the right-hand Table 2-style Pareto-front table.
 
     Unlike `pareto_summary`, this evaluates all displayed methods in one Pareto
-    comparison: EntropicOT/Ours, optional PCA and additive baselines, and the
+    comparison: EntropicOT/Ours, optional additive baseline, and the
     individual components of the selected composition.
     """
     try:
@@ -394,7 +393,6 @@ def build_article_pareto_table(
     if include_baselines:
         aggregation_cols.extend(
             [
-                f"pca {composition_name}".lower(),
                 f"additive {composition_name}".lower(),
             ]
         )
@@ -482,8 +480,6 @@ def article_pareto_method_label(measure: str, composition_name: str) -> str:
     """Map internal columns to the compact labels used in the paper table."""
     if measure == composition_name.lower():
         return "Ours"
-    if measure == f"pca {composition_name}".lower():
-        return "PCA"
     if measure == f"additive {composition_name}".lower():
         return "Additive"
     if measure == "mahalanobis":
@@ -558,8 +554,6 @@ def empty_article_pareto_latex_table() -> pd.DataFrame:
 
 
 def split_pareto_result_name(result_name: str) -> tuple[str, str]:
-    if result_name.startswith("PCA "):
-        return "PCA", result_name.removeprefix("PCA ")
     if result_name.startswith("Additive "):
         return "Additive", result_name.removeprefix("Additive ")
     return "EntropicOT", result_name

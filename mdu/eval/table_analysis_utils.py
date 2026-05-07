@@ -473,7 +473,7 @@ def analyze_composite_pareto_performance(
     of its components across all pairs of problems. Returns stats dict.
 
     By default this evaluates the EntropicOT composition and, when present in
-    `transformed_df`, the matching PCA and additive aggregation baselines.
+    `transformed_df`, the matching additive aggregation baseline.
 
     When do_for_each_measure=True, also calculates Pareto stats for each individual component.
     """
@@ -536,7 +536,6 @@ def _pareto_aggregation_candidates(
     if include_baseline_aggregations:
         candidates.extend(
             [
-                (f"PCA {composite_name}", f"pca {composite_name}".lower()),
                 (
                     f"Additive {composite_name}",
                     f"additive {composite_name}".lower(),
