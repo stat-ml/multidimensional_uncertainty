@@ -99,6 +99,10 @@ component-wise Pareto-front criterion.
 right-hand Table 2-style Pareto-front table for
 `COMPOSITE EAT LOGSCORE OUTER OUTER + M`, comparing Ours, Additive, and the
 individual components in the same Pareto-front calculation.
+`article_pareto_by_problem_table.csv` contains the same Pareto-front calculation
+split by image task type. The notebook also saves
+`article_pareto_by_task_barplot.pdf`, adding LLM selective generation when
+`resources/llm_resources/*_results.csv` is available.
 
 There is also a thin notebook wrapper at `notebooks/paper_tables.ipynb` if you
 want to inspect the generated tables interactively.

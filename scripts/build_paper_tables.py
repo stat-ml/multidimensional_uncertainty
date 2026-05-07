@@ -82,6 +82,7 @@ def main():
         print(f"{problem_type}: {table.shape}")
     print(f"Average-rank rows: {len(bundle.average_ranks)}")
     print(f"Article Pareto rows: {len(bundle.article_pareto_table)}")
+    print(f"Article Pareto by-problem rows: {len(bundle.article_pareto_by_problem_table)}")
     print(f"Composition table groups: {len(bundle.composition_mean_tables)}")
 
 

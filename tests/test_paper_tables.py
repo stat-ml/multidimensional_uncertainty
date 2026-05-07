@@ -8,6 +8,7 @@ import pandas as pd
 from mdu.eval.paper_tables import (
     DEFAULT_AVERAGE_ROW,
     build_and_write_paper_tables,
+    build_article_pareto_by_problem_table,
     build_article_pareto_table,
     build_paper_tables,
 )
@@ -127,6 +128,7 @@ class PaperTablesTest(unittest.TestCase):
         self.assertFalse(bundle.measure_summary.empty)
         self.assertFalse(bundle.pareto_summary.empty)
         self.assertFalse(bundle.article_pareto_table.empty)
+        self.assertIn("problem_type", bundle.article_pareto_by_problem_table.columns)
         self.assertEqual(
             set(bundle.pareto_summary["aggregation"]),
             {"EntropicOT", "Additive"},
@@ -160,6 +162,9 @@ class PaperTablesTest(unittest.TestCase):
             self.assertTrue((output_dir / "average_ranks.csv").exists())
             self.assertTrue((output_dir / "pareto_summary.csv").exists())
             self.assertTrue((output_dir / "article_pareto_table.csv").exists())
+            self.assertTrue(
+                (output_dir / "article_pareto_by_problem_table.csv").exists()
+            )
             self.assertTrue(
                 (output_dir / "latex" / "article_pareto_table.tex").exists()
             )
@@ -201,6 +206,43 @@ class PaperTablesTest(unittest.TestCase):
         scores = dict(zip(table["method"], table["pareto_percentage"]))
         self.assertEqual(scores["Ours"], 100.0)
         self.assertEqual(scores["Additive"], 0.0)
+
+    def test_article_pareto_by_problem_splits_image_tasks(self):
+        rows = []
+        for marker in ["[ood]", "[miscls]", "[selective]"]:
+            for idx in range(3):
+                rows.append(("cifar10", f"task_{idx} {marker}"))
+
+        index = pd.MultiIndex.from_tuples(rows, names=["ind_dataset", "eval"])
+        transformed = pd.DataFrame(
+            {
+                "R_b 1 (Logscore)": [0.4] * len(index),
+                "R_b 1 (Brier)": [0.5] * len(index),
+                COMPOSITION.lower(): [0.8] * len(index),
+                f"additive {COMPOSITION}".lower(): [0.3] * len(index),
+            },
+            index=index,
+        )
+
+        table = build_article_pareto_by_problem_table(transformed, COMPOSITION)
+
+        self.assertEqual(
+            set(table["problem_type"]),
+            {
+                "ood_detection",
+                "misclassification_detection",
+                "selective_prediction",
+            },
+        )
+        ood_ours = table[
+            table["problem_type"].eq("ood_detection") & table["method"].eq("Ours")
+        ]["pareto_percentage"].iloc[0]
+        selective_additive = table[
+            table["problem_type"].eq("selective_prediction")
+            & table["method"].eq("Additive")
+        ]["pareto_percentage"].iloc[0]
+        self.assertEqual(ood_ours, 100.0)
+        self.assertEqual(selective_additive, 0.0)
 
 
 if __name__ == "__main__":

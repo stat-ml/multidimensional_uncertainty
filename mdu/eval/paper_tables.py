@@ -23,6 +23,12 @@ PROBLEM_PATTERNS: Mapping[str, str] = {
     "misclassification_detection": "[miscls]",
     "selective_prediction": "[selective]",
 }
+PROBLEM_LABELS: Mapping[str, str] = {
+    "ood_detection": "OOD",
+    "misclassification_detection": "Misclassification",
+    "selective_prediction": "Selective prediction",
+    "selective_generation": "Selective generation",
+}
 
 DEFAULT_AVERAGE_ROW = ("AVG", "[all rows]")
 DEFAULT_ARTICLE_PARETO_COMPOSITION = "COMPOSITE EAT LOGSCORE OUTER OUTER + M"
@@ -42,6 +48,7 @@ class PaperTableBundle:
     pareto_summary: pd.DataFrame
     article_pareto_table: pd.DataFrame
     article_pareto_latex_table: pd.DataFrame
+    article_pareto_by_problem_table: pd.DataFrame
     composition_mean_tables: Dict[str, Dict[str, pd.DataFrame]]
     composition_std_tables: Dict[str, Dict[str, pd.DataFrame]]
     composition_latex_tables: Dict[str, Dict[str, pd.DataFrame]]
@@ -103,6 +110,7 @@ def build_paper_tables(
     if article_pareto_composition is None:
         article_pareto_table = empty_article_pareto_table()
         article_pareto_latex_table = empty_article_pareto_latex_table()
+        article_pareto_by_problem_table = empty_article_pareto_by_problem_table()
     else:
         article_pareto_table = build_article_pareto_table(
             mean_table,
@@ -111,6 +119,10 @@ def build_paper_tables(
         article_pareto_latex_table = format_article_pareto_table(
             article_pareto_table,
             decimals=mean_decimals,
+        )
+        article_pareto_by_problem_table = build_article_pareto_by_problem_table(
+            mean_table,
+            article_pareto_composition,
         )
 
     composition_mean_tables: Dict[str, Dict[str, pd.DataFrame]] = {}
@@ -156,6 +168,7 @@ def build_paper_tables(
         pareto_summary=pareto_summary,
         article_pareto_table=article_pareto_table,
         article_pareto_latex_table=article_pareto_latex_table,
+        article_pareto_by_problem_table=article_pareto_by_problem_table,
         composition_mean_tables=composition_mean_tables,
         composition_std_tables=composition_std_tables,
         composition_latex_tables=composition_latex_tables,
@@ -476,6 +489,40 @@ def build_article_pareto_table(
     )
 
 
+def build_article_pareto_by_problem_table(
+    transformed_table: pd.DataFrame,
+    composition_name: str,
+    *,
+    include_baselines: bool = True,
+) -> pd.DataFrame:
+    """Build Table 2-style Pareto stats separately for each image task type."""
+    if transformed_table.empty or "eval" not in transformed_table.index.names:
+        return empty_article_pareto_by_problem_table()
+
+    eval_index = transformed_table.index.get_level_values("eval").astype(str)
+    rows = []
+    for problem_type, marker in PROBLEM_PATTERNS.items():
+        problem_table = transformed_table[
+            eval_index.str.contains(marker, regex=False)
+        ]
+        table = build_article_pareto_table(
+            problem_table,
+            composition_name,
+            include_baselines=include_baselines,
+        )
+        if table.empty:
+            continue
+
+        table = table.copy()
+        table.insert(0, "problem_type", problem_type)
+        table.insert(1, "problem_label", PROBLEM_LABELS.get(problem_type, problem_type))
+        rows.append(table)
+
+    if not rows:
+        return empty_article_pareto_by_problem_table()
+    return pd.concat(rows, ignore_index=True)
+
+
 def article_pareto_method_label(measure: str, composition_name: str) -> str:
     """Map internal columns to the compact labels used in the paper table."""
     if measure == composition_name.lower():
@@ -553,6 +600,13 @@ def empty_article_pareto_latex_table() -> pd.DataFrame:
     return pd.DataFrame(columns=["Method", "At Pareto Front (\\%)"])
 
 
+def empty_article_pareto_by_problem_table() -> pd.DataFrame:
+    table = empty_article_pareto_table()
+    table.insert(0, "problem_type", pd.Series(dtype=object))
+    table.insert(1, "problem_label", pd.Series(dtype=object))
+    return table
+
+
 def split_pareto_result_name(result_name: str) -> tuple[str, str]:
     if result_name.startswith("Additive "):
         return "Additive", result_name.removeprefix("Additive ")
@@ -582,6 +636,10 @@ def write_paper_tables(
     bundle.pareto_summary.to_csv(output_path / "pareto_summary.csv", index=False)
     bundle.article_pareto_table.to_csv(
         output_path / "article_pareto_table.csv",
+        index=False,
+    )
+    bundle.article_pareto_by_problem_table.to_csv(
+        output_path / "article_pareto_by_problem_table.csv",
         index=False,
     )
 
