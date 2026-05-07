@@ -523,6 +523,137 @@ def build_article_pareto_by_problem_table(
     return pd.concat(rows, ignore_index=True)
 
 
+def build_llm_selective_generation_pareto_table(
+    results_dir: str | Path,
+    *,
+    target_name: str = "Beta",
+    method_order: Sequence[str] = ("Ours", "Additive"),
+) -> pd.DataFrame:
+    """Build Pareto stats for LLM selective generation result CSVs."""
+    from mdu.eval.aggregation_winners import (
+        llm_matching_compositions,
+        llm_score_columns,
+        load_llm_results_csv,
+    )
+
+    results_dir = Path(results_dir)
+    if not results_dir.exists():
+        print(f"LLM results directory not found: {results_dir}")
+        return empty_llm_selective_generation_pareto_table()
+
+    method_order = tuple(method_order)
+    stats = {
+        method: {"pareto_count": 0, "total_pairs": 0, "depths": []}
+        for method in method_order
+    }
+
+    for path in sorted(results_dir.glob("*_results.csv")):
+        df = load_llm_results_csv(path)
+        if df.empty or "Method" not in df.columns:
+            continue
+
+        score_cols = llm_score_columns(df)
+        if len(score_cols) < 2:
+            continue
+
+        scores = df[["Method", *score_cols]].copy()
+        for col in score_cols:
+            scores[col] = pd.to_numeric(scores[col], errors="coerce")
+        scores = scores.groupby("Method", sort=False)[score_cols].mean()
+
+        method_set = set(map(str, scores.index))
+        all_compositions = llm_matching_compositions(scores.index)
+        target_compositions = [
+            composition
+            for composition in all_compositions
+            if _is_llm_target_composition(composition, target_name)
+        ]
+        tracked_raw_methods = {
+            method
+            for composition in target_compositions
+            for method in (composition, f"Additive_{composition}")
+        }
+        candidate_methods = [
+            method
+            for method in sorted(method_set)
+            if method in tracked_raw_methods
+            or (
+                method not in all_compositions
+                and not method.startswith("Additive_")
+                and not _is_generated_from_known_method(method, method_set)
+            )
+        ]
+        if len(candidate_methods) < 2:
+            continue
+
+        for composition in target_compositions:
+            tracked_methods = {
+                "Ours": composition,
+                "Additive": f"Additive_{composition}",
+            }
+            if any(method not in scores.index for method in tracked_methods.values()):
+                continue
+
+            for col_a, col_b in itertools.combinations(score_cols, 2):
+                points = []
+                labels = []
+                for method in candidate_methods:
+                    value_a = scores.loc[method, col_a]
+                    value_b = scores.loc[method, col_b]
+                    if pd.notna(value_a) and pd.notna(value_b):
+                        points.append((float(value_a), float(value_b)))
+                        labels.append(method)
+
+                if len(points) < 2:
+                    continue
+
+                front_indices = set(pareto_front(points))
+                depths = pareto_depth(points)
+                for label, raw_method in tracked_methods.items():
+                    if label not in stats or raw_method not in labels:
+                        continue
+                    idx = labels.index(raw_method)
+                    stats[label]["total_pairs"] += 1
+                    stats[label]["depths"].append(depths[idx])
+                    if idx in front_indices:
+                        stats[label]["pareto_count"] += 1
+
+    rows = []
+    for method in method_order:
+        total_pairs = stats[method]["total_pairs"]
+        if total_pairs == 0:
+            continue
+        depths = pd.Series(stats[method]["depths"], dtype=float)
+        pareto_count = stats[method]["pareto_count"]
+        rows.append(
+            {
+                "problem_type": "selective_generation",
+                "problem_label": PROBLEM_LABELS["selective_generation"],
+                "method": method,
+                "measure": method,
+                "pareto_count": pareto_count,
+                "total_pairs": total_pairs,
+                "pareto_percentage": (pareto_count / total_pairs) * 100,
+                "average_pareto_depth": depths.mean(),
+                "median_pareto_depth": depths.median(),
+            }
+        )
+
+    if not rows:
+        print(f"No matched LLM Ours/Additive methods found in {results_dir}")
+        return empty_llm_selective_generation_pareto_table()
+    return pd.DataFrame(rows)
+
+
+def _is_llm_target_composition(method: str, target_name: str) -> bool:
+    return f"_{target_name}_" in str(method)
+
+
+def _is_generated_from_known_method(method: str, method_set: set[str]) -> bool:
+    parts = str(method).split("_", 1)
+    return len(parts) == 2 and parts[1] in method_set
+
+
 def article_pareto_method_label(measure: str, composition_name: str) -> str:
     """Map internal columns to the compact labels used in the paper table."""
     if measure == composition_name.lower():
@@ -604,6 +735,11 @@ def empty_article_pareto_by_problem_table() -> pd.DataFrame:
     table = empty_article_pareto_table()
     table.insert(0, "problem_type", pd.Series(dtype=object))
     table.insert(1, "problem_label", pd.Series(dtype=object))
+    return table
+
+
+def empty_llm_selective_generation_pareto_table() -> pd.DataFrame:
+    table = empty_article_pareto_by_problem_table()
     return table
 
 

@@ -211,7 +211,7 @@ def llm_matching_compositions(methods: Sequence[str]) -> list[str]:
     method_set = set(map(str, methods))
     compositions = []
     for method in sorted(method_set):
-        if method.startswith("PCA_") or method.startswith("Additive_"):
+        if method.startswith("Additive_"):
             continue
         if f"Additive_{method}" in method_set:
             compositions.append(method)

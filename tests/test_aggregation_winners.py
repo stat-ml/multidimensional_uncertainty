@@ -50,17 +50,17 @@ class AggregationWinnersTest(unittest.TestCase):
         self.assertAlmostEqual(summary.loc["Ours", "win_rate"], 0.5)
         self.assertAlmostEqual(summary.loc["Additive", "win_rate"], 0.5)
 
-    def test_llm_records_match_pairs_and_ignore_rank_and_pca_columns(self):
+    def test_llm_records_match_pairs_and_ignore_rank_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "llama8b_results.csv"
             pd.DataFrame(
                 {
                     "Method": [
                         "IMBA_5_Beta_FeatureWise",
-                        "PCA_IMBA_5_Beta_FeatureWise",
+                        "Derived_IMBA_5_Beta_FeatureWise",
                         "Additive_IMBA_5_Beta_FeatureWise",
                         "Incomplete",
-                        "PCA_Incomplete",
+                        "Derived_Incomplete",
                     ],
                     "trivia": [0.5, 0.6, 0.4, 0.99, 0.01],
                     "trivia_rank": [3, 1, 2, 1, 2],
@@ -81,7 +81,6 @@ class AggregationWinnersTest(unittest.TestCase):
         )
         self.assertFalse(records["context"].str.contains("rank").any())
         self.assertFalse(records["composition"].str.contains("Incomplete").any())
-        self.assertNotIn("PCA", set(records["aggregation"]))
 
         mmlu = records[records["context"].eq("llama8b | mmlu")]
         credits = dict(zip(mmlu["aggregation"], mmlu["winner_credit"]))
@@ -94,7 +93,7 @@ class AggregationWinnersTest(unittest.TestCase):
                 ",Method,trivia,trivia,mmlu,mmlu,mean,mean",
                 ",,score,rank,score,rank,score,rank",
                 "0,IMBA_5_Beta_FeatureWise,0.5,3,0.7,1,0.6,1",
-                "1,PCA_IMBA_5_Beta_FeatureWise,0.6,1,0.7,1,0.65,1",
+                "1,Derived_IMBA_5_Beta_FeatureWise,0.6,1,0.7,1,0.65,1",
                 "2,Additive_IMBA_5_Beta_FeatureWise,0.4,2,0.1,3,0.25,3",
             ]
         )
@@ -118,7 +117,6 @@ class AggregationWinnersTest(unittest.TestCase):
         credits = dict(zip(trivia["aggregation"], trivia["winner_credit"]))
         self.assertEqual(credits["Ours"], 1.0)
         self.assertEqual(credits["Additive"], 0.0)
-        self.assertNotIn("PCA", set(records["aggregation"]))
 
 
 def _fake_image_results():

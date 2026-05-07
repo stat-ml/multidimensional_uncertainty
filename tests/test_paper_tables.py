@@ -10,6 +10,7 @@ from mdu.eval.paper_tables import (
     build_and_write_paper_tables,
     build_article_pareto_by_problem_table,
     build_article_pareto_table,
+    build_llm_selective_generation_pareto_table,
     build_paper_tables,
 )
 
@@ -243,6 +244,33 @@ class PaperTablesTest(unittest.TestCase):
         ]["pareto_percentage"].iloc[0]
         self.assertEqual(ood_ours, 100.0)
         self.assertEqual(selective_additive, 0.0)
+
+    def test_llm_selective_generation_pareto_uses_beta_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "fake_results.csv"
+            pd.DataFrame(
+                {
+                    "Method": [
+                        "IMBA_5_Beta_FeatureWise",
+                        "Additive_IMBA_5_Beta_FeatureWise",
+                        "IMBA_5_Exp_FeatureWise",
+                        "Additive_IMBA_5_Exp_FeatureWise",
+                        "Derived_IMBA_5_Beta_FeatureWise",
+                        "BaseMetric",
+                    ],
+                    "task_a": [0.8, 0.2, 1.0, 0.9, 1.0, 0.1],
+                    "task_b": [0.8, 0.2, 1.0, 0.9, 1.0, 0.9],
+                }
+            ).to_csv(path, index=False)
+
+            table = build_llm_selective_generation_pareto_table(tmp)
+
+        scores = dict(zip(table["method"], table["pareto_percentage"]))
+        totals = dict(zip(table["method"], table["total_pairs"]))
+        self.assertEqual(scores["Ours"], 100.0)
+        self.assertEqual(scores["Additive"], 0.0)
+        self.assertEqual(totals["Ours"], 1)
+        self.assertEqual(totals["Additive"], 1)
 
 
 if __name__ == "__main__":
